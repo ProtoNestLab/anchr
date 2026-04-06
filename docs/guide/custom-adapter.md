@@ -2,22 +2,94 @@
 
 The SDK uses an `Adapter` interface for data persistence. Implement it to connect to any backend.
 
-## Adapter Interface
+## Built-in REST Adapter
+
+The quickest way to connect to a backend:
 
 ```ts
-interface Adapter {
-  getThreads(anchorId: string): Promise<Thread[]>
-  createThread(anchorId: string, content: string): Promise<Thread>
-  addMessage(threadId: string, content: string): Promise<Message>
+import { createClient, createRestAdapter } from '@anchor-sdk/core'
+
+const client = createClient({
+  adapter: createRestAdapter({
+    baseUrl: 'https://api.example.com',
+    headers: { Authorization: `Bearer ${token}` },
+  }),
+})
+```
+
+### Expected Endpoints
+
+The REST adapter expects the following endpoints:
+
+| Method   | Endpoint                         | Body                    | Returns    | Description                |
+| -------- | -------------------------------- | ----------------------- | ---------- | -------------------------- |
+| `GET`    | `/threads?anchorId=:id`          | —                       | `Thread[]` | List threads for an anchor |
+| `POST`   | `/threads`                       | `{ anchorId, content }` | `Thread`   | Create a new thread        |
+| `PATCH`  | `/threads/:id/resolve`           | —                       | `Thread`   | Mark thread as resolved    |
+| `PATCH`  | `/threads/:id/reopen`            | —                       | `Thread`   | Reopen a resolved thread   |
+| `DELETE` | `/threads/:id`                   | —                       | —          | Delete a thread            |
+| `POST`   | `/threads/:id/messages`          | `{ content }`           | `Message`  | Add message to thread      |
+| `PATCH`  | `/messages/:id`                  | `{ content }`           | `Message`  | Edit a message             |
+| `DELETE` | `/threads/:tid/messages/:mid`    | —                       | —          | Delete a message           |
+| `POST`   | `/messages/:id/reactions`        | `{ emoji }`             | `Message`  | Add emoji reaction         |
+| `DELETE` | `/messages/:id/reactions/:emoji` | —                       | `Message`  | Remove emoji reaction      |
+
+### Response Schemas
+
+Your API should return objects matching these types:
+
+```ts
+type Thread = {
+  id: string
+  anchorId: string
+  messages: Message[]
+  resolved: boolean
+  lastActivityAt: number
+}
+
+type Message = {
+  id: string
+  content: string
+  createdAt: number
+  updatedAt?: number
+  user: { id: string; name: string; avatar?: string }
+  reactions: { emoji: string; userId: string }[]
 }
 ```
 
-## Example: REST API Adapter
+## Adapter Interface
+
+For full control, implement the `Adapter` interface directly:
+
+```ts
+interface Adapter {
+  // Threads
+  getThreads(anchorId: string): Promise<Thread[]>
+  createThread(anchorId: string, content: string): Promise<Thread>
+  resolveThread(threadId: string): Promise<Thread>
+  reopenThread(threadId: string): Promise<Thread>
+  deleteThread(threadId: string): Promise<void>
+
+  // Messages
+  addMessage(threadId: string, content: string): Promise<Message>
+  editMessage(messageId: string, content: string): Promise<Message>
+  deleteMessage(threadId: string, messageId: string): Promise<void>
+
+  // Reactions
+  addReaction(messageId: string, emoji: string): Promise<Message>
+  removeReaction(messageId: string, emoji: string): Promise<Message>
+
+  // Real-time (optional)
+  subscribe?(anchorId: string, callback: (threads: Thread[]) => void): () => void
+}
+```
+
+## Example: Custom Implementation
 
 ```ts
 import type { Adapter } from '@anchor-sdk/core'
 
-const restAdapter: Adapter = {
+const myAdapter: Adapter = {
   async getThreads(anchorId) {
     const res = await fetch(`/api/threads?anchorId=${anchorId}`)
     return res.json()
@@ -32,6 +104,20 @@ const restAdapter: Adapter = {
     return res.json()
   },
 
+  async resolveThread(threadId) {
+    const res = await fetch(`/api/threads/${threadId}/resolve`, { method: 'PATCH' })
+    return res.json()
+  },
+
+  async reopenThread(threadId) {
+    const res = await fetch(`/api/threads/${threadId}/reopen`, { method: 'PATCH' })
+    return res.json()
+  },
+
+  async deleteThread(threadId) {
+    await fetch(`/api/threads/${threadId}`, { method: 'DELETE' })
+  },
+
   async addMessage(threadId, content) {
     const res = await fetch(`/api/threads/${threadId}/messages`, {
       method: 'POST',
@@ -39,6 +125,42 @@ const restAdapter: Adapter = {
       body: JSON.stringify({ content }),
     })
     return res.json()
+  },
+
+  async editMessage(messageId, content) {
+    const res = await fetch(`/api/messages/${messageId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ content }),
+    })
+    return res.json()
+  },
+
+  async deleteMessage(threadId, messageId) {
+    await fetch(`/api/threads/${threadId}/messages/${messageId}`, { method: 'DELETE' })
+  },
+
+  async addReaction(messageId, emoji) {
+    const res = await fetch(`/api/messages/${messageId}/reactions`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ emoji }),
+    })
+    return res.json()
+  },
+
+  async removeReaction(messageId, emoji) {
+    const res = await fetch(`/api/messages/${messageId}/reactions/${encodeURIComponent(emoji)}`, {
+      method: 'DELETE',
+    })
+    return res.json()
+  },
+
+  // Optional: real-time updates
+  subscribe(anchorId, callback) {
+    const es = new EventSource(`/api/threads/stream?anchorId=${anchorId}`)
+    es.onmessage = (e) => callback(JSON.parse(e.data))
+    return () => es.close()
   },
 }
 ```
@@ -48,5 +170,8 @@ const restAdapter: Adapter = {
 ```ts
 import { createClient } from '@anchor-sdk/core'
 
-const client = createClient({ adapter: restAdapter })
+const client = createClient({
+  adapter: myAdapter,
+  user: { id: 'u1', name: 'Alice' },
+})
 ```
