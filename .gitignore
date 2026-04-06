@@ -1,0 +1,44 @@
+# Dependencies
+node_modules/
+
+# Build outputs
+dist/
+*.tsbuildinfo
+
+# Vite
+.vite/
+
+# Logs & debug
+logs/
+*.log
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Environment (secrets / local overrides)
+.env
+.env.*
+!.env.example
+
+# Test & coverage
+coverage/
+.nyc_output/
+
+# Caches
+.cache/
+.parcel-cache/
+.turbo/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor (keep shared .vscode settings if you commit them; this ignores local junk)
+.idea/
+*.swp
+*.swo
+*~
+
+# Optional: local tooling
+.vercel/
