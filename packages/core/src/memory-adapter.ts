@@ -5,6 +5,10 @@ function uid(): string {
   return `id_${++counter}_${Date.now()}`
 }
 
+function snapshotUser(u: User): User {
+  return { id: u.id, name: u.name, ...(u.avatar ? { avatar: u.avatar } : {}) }
+}
+
 export function createMemoryAdapter(user?: User): Adapter {
   const currentUser = user ?? { id: 'user-1', name: 'Anonymous' }
   const threadsByAnchor = new Map<string, Thread[]>()
@@ -50,7 +54,7 @@ export function createMemoryAdapter(user?: User): Adapter {
             id: uid(),
             content,
             createdAt: now,
-            user: currentUser,
+            user: snapshotUser(currentUser),
             reactions: [],
           },
         ],
@@ -103,7 +107,7 @@ export function createMemoryAdapter(user?: User): Adapter {
         id: uid(),
         content,
         createdAt: now,
-        user: currentUser,
+        user: snapshotUser(currentUser),
         reactions: [],
       }
       thread.messages.push(message)
