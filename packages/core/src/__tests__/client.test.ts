@@ -7,4 +7,15 @@ describe('createClient', () => {
     const client = createClient({ adapter })
     expect(client.adapter).toBe(adapter)
   })
+
+  it('should use default anonymous user when no user provided', () => {
+    const client = createClient({ adapter: createMemoryAdapter() })
+    expect(client.user).toEqual({ id: 'anonymous', name: 'Anonymous' })
+  })
+
+  it('should use provided user', () => {
+    const user = { id: 'u1', name: 'Alice' }
+    const client = createClient({ adapter: createMemoryAdapter(), user })
+    expect(client.user).toEqual(user)
+  })
 })

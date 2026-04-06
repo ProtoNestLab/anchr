@@ -1,12 +1,12 @@
 # @anchor-sdk/vue
 
-Vue 3 integration package with components and composables.
+Vue 3 integration with components and composables.
 
 ## Components
 
 ### `<CollabProvider>`
 
-Root provider component. Provides the client to all descendant components via Vue's dependency injection.
+Root provider. Provides the client to all descendants via Vue's dependency injection.
 
 ```vue
 <CollabProvider :client="client">
@@ -14,9 +14,9 @@ Root provider component. Provides the client to all descendant components via Vu
 </CollabProvider>
 ```
 
-| Prop     | Type     | Required | Description                           |
-| -------- | -------- | -------- | ------------------------------------- |
-| `client` | `Client` | Yes      | Client instance from `createClient()` |
+| Prop     | Type     | Required | Description                  |
+| -------- | -------- | -------- | ---------------------------- |
+| `client` | `Client` | Yes      | Client from `createClient()` |
 
 ### `<Anchor>`
 
@@ -25,7 +25,6 @@ Wraps content to make it a discussable anchor point.
 ```vue
 <Anchor id="order-123">
   <div>Order #123</div>
-
   <template #overlay="{ hovered }">
     <CommentButton v-if="hovered" @click="open" />
   </template>
@@ -45,22 +44,48 @@ Wraps content to make it a discussable anchor point.
 
 ### `useThreads(anchorId)`
 
-Manages threads for a specific anchor. Automatically fetches threads on mount.
+Full thread CRUD for a specific anchor. Auto-fetches on mount. Subscribes to real-time updates if the adapter supports it.
 
 ```ts
-const { threads, createThread, addMessage, refresh } = useThreads('order-123')
+const {
+  threads, // Ref<Thread[]>
+  createThread, // (content: string) => Promise<void>
+  addMessage, // (threadId, content) => Promise<void>
+  editMessage, // (messageId, content) => Promise<Message>
+  deleteMessage, // (threadId, messageId) => Promise<void>
+  resolveThread, // (threadId) => Promise<void>
+  reopenThread, // (threadId) => Promise<void>
+  deleteThread, // (threadId) => Promise<void>
+  addReaction, // (messageId, emoji) => Promise<void>
+  removeReaction, // (messageId, emoji) => Promise<void>
+  refresh, // () => Promise<void>
+} = useThreads('order-123')
 ```
 
-| Return         | Type                                                   | Description              |
-| -------------- | ------------------------------------------------------ | ------------------------ |
-| `threads`      | `Ref<Thread[]>`                                        | Reactive thread list     |
-| `createThread` | `(content: string) => Promise<void>`                   | Create a new thread      |
-| `addMessage`   | `(threadId: string, content: string) => Promise<void>` | Add message to thread    |
-| `refresh`      | `() => Promise<void>`                                  | Manually refresh threads |
+### `useAnchor(anchorId)`
+
+Headless composable — all discussion logic with zero UI. See [Headless Mode](/guide/headless).
+
+```ts
+const {
+  threads,
+  open,
+  messageCount,
+  unreadCount,
+  hasThreads,
+  currentUser,
+  send,
+  toggle,
+  show,
+  hide,
+  markAsRead,
+  // ...plus all useThreads methods
+} = useAnchor('my-element')
+```
 
 ### `useClient()`
 
-Retrieves the injected client. Must be called inside a `<CollabProvider>`.
+Retrieves the injected client. Must be inside a `<CollabProvider>`.
 
 ```ts
 const client = useClient()

@@ -1,3 +1,5 @@
-export type { Anchor, Message, Thread, Adapter } from './types'
-export { createClient, type Client } from './client'
+export type { Anchor, User, Reaction, Message, Thread, Adapter } from './types'
+export { createClient, type Client, type ClientOptions } from './client'
 export { createMemoryAdapter } from './memory-adapter'
+export { applyPlugins, type Plugin, type PluginContext } from './plugin'
+export { createRestAdapter, type RestAdapterOptions } from './adapters/rest'
