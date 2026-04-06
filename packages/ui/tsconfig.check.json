@@ -1,0 +1,10 @@
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "paths": {
+      "@anchor-sdk/core": ["../core/src/index.ts"],
+      "@anchor-sdk/vue": ["../vue/src/index.ts"]
+    }
+  },
+  "include": ["src"]
+}

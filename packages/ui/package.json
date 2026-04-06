@@ -15,7 +15,7 @@
   ],
   "scripts": {
     "build": "vite build && vue-tsc --declaration --emitDeclarationOnly --outDir dist",
-    "typecheck": "vue-tsc --noEmit"
+    "typecheck": "vue-tsc --noEmit -p tsconfig.check.json"
   },
   "dependencies": {
     "@anchor-sdk/core": "workspace:*",
