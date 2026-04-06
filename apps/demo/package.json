@@ -10,7 +10,7 @@
   "dependencies": {
     "@anchor-sdk/core": "workspace:*",
     "@anchor-sdk/vue": "workspace:*",
-    "@anchor-sdk/ui": "workspace:*",
+    "element-plus": "^2.13.6",
     "vue": "^3.4.0"
   },
   "devDependencies": {

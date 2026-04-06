@@ -146,6 +146,17 @@ describe('createMemoryAdapter', () => {
     expect(thread.messages[0].user).toEqual(user)
   })
 
+  it('should snapshot user so mutating the passed-in user later does not change stored messages', async () => {
+    const user = { id: 'u1', name: 'Alice' }
+    const adapter = createMemoryAdapter(user)
+    await adapter.createThread('a', 'hello')
+    user.name = 'Bob'
+    user.id = 'u2'
+    const threads = await adapter.getThreads('a')
+    expect(threads[0].messages[0].user.name).toBe('Alice')
+    expect(threads[0].messages[0].user.id).toBe('u1')
+  })
+
   // --- Subscribe ---
 
   it('should notify subscribers on changes', async () => {
