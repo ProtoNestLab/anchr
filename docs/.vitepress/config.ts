@@ -12,10 +12,13 @@ export default defineConfig({
     sidebar: {
       '/guide/': [
         {
-          text: 'Introduction',
+          text: 'Guide',
           items: [
             { text: 'Getting Started', link: '/guide/getting-started' },
             { text: 'Custom Adapter', link: '/guide/custom-adapter' },
+            { text: 'Plugins', link: '/guide/plugins' },
+            { text: 'Theming', link: '/guide/theming' },
+            { text: 'Headless Mode', link: '/guide/headless' },
           ],
         },
       ],
@@ -31,6 +34,6 @@ export default defineConfig({
         },
       ],
     },
-    socialLinks: [{ icon: 'github', link: 'https://github.com/user/anchr' }],
+    socialLinks: [{ icon: 'github', link: 'https://github.com/ProtoNestLab/anchr' }],
   },
 })

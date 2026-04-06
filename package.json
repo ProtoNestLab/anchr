@@ -18,6 +18,7 @@
     "changeset": "changeset",
     "version": "changeset version",
     "release": "pnpm build && changeset publish",
+    "size": "size-limit",
     "prepare": "husky"
   },
   "devDependencies": {
@@ -31,6 +32,8 @@
     "lint-staged": "^15.0.0",
     "prettier": "^3.4.0",
     "typescript-eslint": "^8.0.0",
+    "size-limit": "^11.0.0",
+    "@size-limit/file": "^11.0.0",
     "vitepress": "^1.6.0",
     "vitest": "^3.0.0"
   },

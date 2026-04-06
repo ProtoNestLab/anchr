@@ -1,5 +1,9 @@
 # Getting Started
 
+## Try Online
+
+[![Open in StackBlitz](https://developer.stackblitz.com/img/open_in_stackblitz.svg)](https://stackblitz.com/github/ProtoNestLab/anchr/tree/main/apps/demo?file=src/App.vue)
+
 ## Installation
 
 ```bash
@@ -14,7 +18,10 @@ import { createClient, createMemoryAdapter } from '@anchor-sdk/core'
 import { CollabProvider } from '@anchor-sdk/vue'
 import { AnchorDiscussion } from '@anchor-sdk/ui'
 
-const client = createClient({ adapter: createMemoryAdapter() })
+const client = createClient({
+  adapter: createMemoryAdapter(),
+  user: { id: 'u1', name: 'Alice' },
+})
 </script>
 
 <template>
@@ -28,9 +35,27 @@ const client = createClient({ adapter: createMemoryAdapter() })
 
 This gives you:
 
-- Hover to show a comment button (💬)
+- Hover to show a comment button with unread indicator
 - Click to open a discussion popover
-- Create and view discussion threads
+- Create, edit, and delete messages
+- Resolve/reopen threads
+- Emoji reactions
+- Markdown rendering
+- Keyboard navigation (Esc to close, Enter to send)
+
+## With a REST Backend
+
+```ts
+import { createClient, createRestAdapter } from '@anchor-sdk/core'
+
+const client = createClient({
+  adapter: createRestAdapter({
+    baseUrl: 'https://api.example.com',
+    headers: { Authorization: `Bearer ${token}` },
+  }),
+  user: { id: currentUser.id, name: currentUser.name },
+})
+```
 
 ## Full Example
 
@@ -40,7 +65,10 @@ import { createClient, createMemoryAdapter } from '@anchor-sdk/core'
 import { CollabProvider } from '@anchor-sdk/vue'
 import { AnchorDiscussion } from '@anchor-sdk/ui'
 
-const client = createClient({ adapter: createMemoryAdapter() })
+const client = createClient({
+  adapter: createMemoryAdapter(),
+  user: { id: 'u1', name: 'Alice' },
+})
 
 const orders = [
   { id: 1, name: 'Order A', status: 'Pending' },
@@ -61,3 +89,10 @@ const orders = [
   </CollabProvider>
 </template>
 ```
+
+## Next Steps
+
+- [Custom Adapter](/guide/custom-adapter) — Connect to your own backend
+- [Plugins](/guide/plugins) — Hook into message lifecycle
+- [Theming](/guide/theming) — Customize colors and dark mode
+- [Headless Mode](/guide/headless) — Build fully custom UI

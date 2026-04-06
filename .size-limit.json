@@ -1,0 +1,17 @@
+[
+  {
+    "name": "@anchor-sdk/core",
+    "path": "packages/core/dist/index.js",
+    "limit": "2 kB"
+  },
+  {
+    "name": "@anchor-sdk/vue",
+    "path": "packages/vue/dist/anchor-vue.js",
+    "limit": "3 kB"
+  },
+  {
+    "name": "@anchor-sdk/ui",
+    "path": "packages/ui/dist/anchor-ui.js",
+    "limit": "15 kB"
+  }
+]

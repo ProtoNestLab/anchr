@@ -1,15 +1,25 @@
 # @anchor-sdk/core
 
-Core package providing types, client factory, and adapter interface.
+Core package providing types, client factory, adapters, and plugin system.
 
 ## Types
 
-### `Anchor`
+### `User`
 
 ```ts
-type Anchor = {
+type User = {
   id: string
-  type?: string
+  name: string
+  avatar?: string
+}
+```
+
+### `Reaction`
+
+```ts
+type Reaction = {
+  emoji: string
+  userId: string
 }
 ```
 
@@ -20,7 +30,9 @@ type Message = {
   id: string
   content: string
   createdAt: number
-  user: { id: string; name: string }
+  updatedAt?: number
+  user: User
+  reactions: Reaction[]
 }
 ```
 
@@ -32,6 +44,7 @@ type Thread = {
   anchorId: string
   messages: Message[]
   resolved: boolean
+  lastActivityAt: number
 }
 ```
 
@@ -39,9 +52,24 @@ type Thread = {
 
 ```ts
 interface Adapter {
+  // Threads
   getThreads(anchorId: string): Promise<Thread[]>
   createThread(anchorId: string, content: string): Promise<Thread>
+  resolveThread(threadId: string): Promise<Thread>
+  reopenThread(threadId: string): Promise<Thread>
+  deleteThread(threadId: string): Promise<void>
+
+  // Messages
   addMessage(threadId: string, content: string): Promise<Message>
+  editMessage(messageId: string, content: string): Promise<Message>
+  deleteMessage(threadId: string, messageId: string): Promise<void>
+
+  // Reactions
+  addReaction(messageId: string, emoji: string): Promise<Message>
+  removeReaction(messageId: string, emoji: string): Promise<Message>
+
+  // Real-time (optional)
+  subscribe?(anchorId: string, callback: (threads: Thread[]) => void): () => void
 }
 ```
 
@@ -49,28 +77,70 @@ interface Adapter {
 
 ### `createClient(options)`
 
-Creates an SDK client instance.
-
 ```ts
-import { createClient } from '@anchor-sdk/core'
+import { createClient, createMemoryAdapter } from '@anchor-sdk/core'
 
-const client = createClient({ adapter })
+const client = createClient({
+  adapter: createMemoryAdapter(),
+  user: { id: 'u1', name: 'Alice' }, // optional, defaults to Anonymous
+  plugins: [myPlugin], // optional
+})
 ```
 
-| Param             | Type      | Description           |
-| ----------------- | --------- | --------------------- |
-| `options.adapter` | `Adapter` | Data adapter instance |
+| Param             | Type       | Required | Description           |
+| ----------------- | ---------- | -------- | --------------------- |
+| `options.adapter` | `Adapter`  | Yes      | Data adapter          |
+| `options.user`    | `User`     | No       | Current user identity |
+| `options.plugins` | `Plugin[]` | No       | Plugins to apply      |
 
-**Returns:** `Client` object with an `adapter` property.
+### `createMemoryAdapter(user?)`
 
-### `createMemoryAdapter()`
-
-Creates an in-memory adapter for demos and testing. Data is lost on page refresh.
+In-memory adapter for demos and testing.
 
 ```ts
-import { createMemoryAdapter } from '@anchor-sdk/core'
-
 const adapter = createMemoryAdapter()
+// or with a specific user:
+const adapter = createMemoryAdapter({ id: 'u1', name: 'Alice' })
 ```
 
-**Returns:** An `Adapter` implementation.
+### `createRestAdapter(options)`
+
+REST API adapter for connecting to a backend.
+
+```ts
+import { createRestAdapter } from '@anchor-sdk/core'
+
+const adapter = createRestAdapter({
+  baseUrl: 'https://api.example.com',
+  headers: { Authorization: 'Bearer token' },
+})
+```
+
+See [Custom Adapter](/guide/custom-adapter) for the expected endpoint contract.
+
+## Plugin System
+
+See [Plugins Guide](/guide/plugins) for full documentation.
+
+```ts
+import type { Plugin } from '@anchor-sdk/core'
+
+const myPlugin: Plugin = {
+  name: 'my-plugin',
+  install(ctx) {
+    /* ... */
+  },
+  beforeCreateThread(anchorId, content) {
+    /* ... */
+  },
+  afterCreateThread(thread) {
+    /* ... */
+  },
+  beforeAddMessage(threadId, content) {
+    /* ... */
+  },
+  afterAddMessage(message) {
+    /* ... */
+  },
+}
+```

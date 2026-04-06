@@ -1,20 +1,33 @@
 <script setup lang="ts">
-import { ref, toRef } from 'vue'
+import { ref, toRef, nextTick } from 'vue'
 import { useFloating, offset, flip, shift } from '@floating-ui/vue'
-import type { Thread } from '@anchor-sdk/core'
+import type { Thread, Message } from '@anchor-sdk/core'
+import { renderMarkdown } from './markdown'
 
 const props = defineProps<{
   threads: Thread[]
   referenceEl: HTMLElement | null
+  currentUserId?: string
 }>()
 
 const emit = defineEmits<{
   send: [content: string]
   close: []
+  resolve: [threadId: string]
+  reopen: [threadId: string]
+  deleteThread: [threadId: string]
+  editMessage: [messageId: string, content: string]
+  deleteMessage: [threadId: string, messageId: string]
+  addReaction: [messageId: string, emoji: string]
+  removeReaction: [messageId: string, emoji: string]
 }>()
 
 const floating = ref<HTMLElement | null>(null)
 const input = ref('')
+const inputEl = ref<HTMLInputElement | null>(null)
+const editingId = ref<string | null>(null)
+const editContent = ref('')
+const reactionPickerFor = ref<string | null>(null)
 
 const reference = toRef(props, 'referenceEl')
 
@@ -23,6 +36,8 @@ const { floatingStyles } = useFloating(reference, floating, {
   middleware: [offset(8), flip(), shift({ padding: 8 })],
 })
 
+const quickEmojis = ['👍', '👎', '❤️', '😄', '🎉', '😕']
+
 function send() {
   const text = input.value.trim()
   if (!text) return
@@ -30,38 +45,200 @@ function send() {
   input.value = ''
 }
 
+function startEdit(msg: Message) {
+  editingId.value = msg.id
+  editContent.value = msg.content
+  nextTick(() => {
+    const el = document.querySelector('.edit-input') as HTMLInputElement
+    el?.focus()
+  })
+}
+
+function confirmEdit(messageId: string) {
+  const text = editContent.value.trim()
+  if (text && text !== '') {
+    emit('editMessage', messageId, text)
+  }
+  editingId.value = null
+}
+
+function cancelEdit() {
+  editingId.value = null
+}
+
+function toggleReactionPicker(messageId: string) {
+  reactionPickerFor.value = reactionPickerFor.value === messageId ? null : messageId
+}
+
+function handleReaction(
+  messageId: string,
+  emoji: string,
+  reactions: { emoji: string; userId: string }[],
+) {
+  const hasReacted = reactions.some((r) => r.emoji === emoji && r.userId === props.currentUserId)
+  if (hasReacted) {
+    emit('removeReaction', messageId, emoji)
+  } else {
+    emit('addReaction', messageId, emoji)
+  }
+  reactionPickerFor.value = null
+}
+
+function groupReactions(reactions: { emoji: string; userId: string }[]) {
+  const map = new Map<string, string[]>()
+  for (const r of reactions) {
+    if (!map.has(r.emoji)) map.set(r.emoji, [])
+    map.get(r.emoji)!.push(r.userId)
+  }
+  return Array.from(map.entries()).map(([emoji, userIds]) => ({
+    emoji,
+    count: userIds.length,
+    active: userIds.includes(props.currentUserId ?? ''),
+  }))
+}
+
 function formatTime(ts: number) {
   return new Date(ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+}
+
+function onKeydown(e: KeyboardEvent) {
+  if (e.key === 'Escape') {
+    if (editingId.value) {
+      cancelEdit()
+    } else {
+      emit('close')
+    }
+  }
 }
 </script>
 
 <template>
   <Teleport to="body">
-    <div class="popover-backdrop" @click.self="emit('close')">
-      <div ref="floating" :style="floatingStyles" class="thread-popover">
-        <div class="popover-header">
+    <div class="anchor-popover-backdrop" @click.self="emit('close')" @keydown="onKeydown">
+      <div ref="floating" :style="floatingStyles" class="anchor-thread-popover" tabindex="-1">
+        <div class="anchor-popover-header">
           <span>Discussion</span>
-          <button class="close-btn" @click="emit('close')">✕</button>
+          <button class="anchor-close-btn" @click="emit('close')">✕</button>
         </div>
 
-        <div class="thread-list">
+        <div class="anchor-thread-list">
           <template v-if="threads.length === 0">
-            <p class="empty">No comments yet. Start the conversation!</p>
+            <p class="anchor-empty">No comments yet. Start the conversation!</p>
           </template>
           <template v-for="thread in threads" :key="thread.id">
-            <div v-for="msg in thread.messages" :key="msg.id" class="message">
-              <div class="message-header">
-                <strong>{{ msg.user.name }}</strong>
-                <span class="time">{{ formatTime(msg.createdAt) }}</span>
+            <div class="anchor-thread-block" :class="{ 'anchor-resolved': thread.resolved }">
+              <div class="anchor-thread-actions">
+                <button
+                  v-if="!thread.resolved"
+                  class="anchor-action-btn"
+                  title="Resolve"
+                  @click="emit('resolve', thread.id)"
+                >
+                  ✓
+                </button>
+                <button
+                  v-else
+                  class="anchor-action-btn"
+                  title="Reopen"
+                  @click="emit('reopen', thread.id)"
+                >
+                  ↺
+                </button>
+                <button
+                  class="anchor-action-btn anchor-danger"
+                  title="Delete thread"
+                  @click="emit('deleteThread', thread.id)"
+                >
+                  🗑
+                </button>
               </div>
-              <p class="message-body">{{ msg.content }}</p>
+              <div v-if="thread.resolved" class="anchor-resolved-badge">Resolved</div>
+
+              <div v-for="msg in thread.messages" :key="msg.id" class="anchor-message">
+                <div class="anchor-message-header">
+                  <strong>{{ msg.user.name }}</strong>
+                  <span class="anchor-time">{{ formatTime(msg.createdAt) }}</span>
+                  <span v-if="msg.updatedAt" class="anchor-edited">(edited)</span>
+                </div>
+
+                <div v-if="editingId === msg.id" class="anchor-edit-row">
+                  <input
+                    v-model="editContent"
+                    class="anchor-edit-input edit-input"
+                    @keydown.enter="confirmEdit(msg.id)"
+                    @keydown.escape="cancelEdit"
+                  />
+                  <button class="anchor-action-btn" @click="confirmEdit(msg.id)">✓</button>
+                  <button class="anchor-action-btn" @click="cancelEdit">✕</button>
+                </div>
+                <!-- eslint-disable-next-line vue/no-v-html -->
+                <p v-else class="anchor-message-body" v-html="renderMarkdown(msg.content)" />
+
+                <!-- Reactions display -->
+                <div v-if="msg.reactions.length > 0" class="anchor-reactions">
+                  <button
+                    v-for="r in groupReactions(msg.reactions)"
+                    :key="r.emoji"
+                    class="anchor-reaction-badge"
+                    :class="{ 'anchor-reaction-active': r.active }"
+                    @click="handleReaction(msg.id, r.emoji, msg.reactions)"
+                  >
+                    {{ r.emoji }} {{ r.count }}
+                  </button>
+                </div>
+
+                <!-- Message actions -->
+                <div class="anchor-message-actions">
+                  <button
+                    class="anchor-msg-action-btn"
+                    title="React"
+                    @click="toggleReactionPicker(msg.id)"
+                  >
+                    😀
+                  </button>
+                  <button
+                    v-if="msg.user.id === currentUserId"
+                    class="anchor-msg-action-btn"
+                    title="Edit"
+                    @click="startEdit(msg)"
+                  >
+                    ✏️
+                  </button>
+                  <button
+                    v-if="msg.user.id === currentUserId"
+                    class="anchor-msg-action-btn"
+                    title="Delete"
+                    @click="emit('deleteMessage', thread.id, msg.id)"
+                  >
+                    🗑
+                  </button>
+                </div>
+
+                <!-- Reaction picker -->
+                <div v-if="reactionPickerFor === msg.id" class="anchor-reaction-picker">
+                  <button
+                    v-for="emoji in quickEmojis"
+                    :key="emoji"
+                    class="anchor-emoji-btn"
+                    @click="handleReaction(msg.id, emoji, msg.reactions)"
+                  >
+                    {{ emoji }}
+                  </button>
+                </div>
+              </div>
             </div>
           </template>
         </div>
 
-        <form class="input-row" @submit.prevent="send">
-          <input v-model="input" placeholder="Write a comment…" class="comment-input" />
-          <button type="submit" class="send-btn">Send</button>
+        <form class="anchor-input-row" @submit.prevent="send">
+          <input
+            ref="inputEl"
+            v-model="input"
+            placeholder="Write a comment…"
+            class="anchor-comment-input"
+            @keydown.escape="emit('close')"
+          />
+          <button type="submit" class="anchor-send-btn">Send</button>
         </form>
       </div>
     </div>
@@ -69,91 +246,225 @@ function formatTime(ts: number) {
 </template>
 
 <style scoped>
-.popover-backdrop {
+.anchor-popover-backdrop {
   position: fixed;
   inset: 0;
   z-index: 1000;
 }
-.thread-popover {
-  width: 320px;
-  max-height: 400px;
+.anchor-thread-popover {
+  width: 360px;
+  max-height: 480px;
   display: flex;
   flex-direction: column;
-  background: #fff;
-  border: 1px solid #ddd;
+  background: var(--anchor-bg, #fff);
+  border: 1px solid var(--anchor-border, #ddd);
   border-radius: 8px;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+  box-shadow: 0 4px 16px var(--anchor-shadow, rgba(0, 0, 0, 0.12));
   font-size: 14px;
+  color: var(--anchor-text, #333);
   z-index: 1001;
 }
-.popover-header {
+.anchor-popover-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
   padding: 8px 12px;
-  border-bottom: 1px solid #eee;
+  border-bottom: 1px solid var(--anchor-border, #eee);
   font-weight: 600;
 }
-.close-btn {
+.anchor-close-btn {
   background: none;
   border: none;
   cursor: pointer;
   font-size: 16px;
-  color: #888;
+  color: var(--anchor-text-muted, #888);
 }
-.thread-list {
+.anchor-thread-list {
   flex: 1;
   overflow-y: auto;
   padding: 8px 12px;
 }
-.empty {
-  color: #999;
+.anchor-empty {
+  color: var(--anchor-text-muted, #999);
   text-align: center;
   margin: 16px 0;
 }
-.message {
-  margin-bottom: 10px;
+.anchor-thread-block {
+  position: relative;
+  margin-bottom: 12px;
+  padding: 8px;
+  border-radius: 6px;
+  border: 1px solid var(--anchor-border, #eee);
 }
-.message-header {
+.anchor-thread-block.anchor-resolved {
+  opacity: 0.7;
+}
+.anchor-thread-actions {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  display: flex;
+  gap: 2px;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.anchor-thread-block:hover .anchor-thread-actions {
+  opacity: 1;
+}
+.anchor-action-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 12px;
+  padding: 2px 4px;
+  border-radius: 4px;
+  color: var(--anchor-text-muted, #888);
+}
+.anchor-action-btn:hover {
+  background: var(--anchor-hover, #f0f0f0);
+}
+.anchor-action-btn.anchor-danger:hover {
+  background: #fee;
+  color: #c00;
+}
+.anchor-resolved-badge {
+  font-size: 11px;
+  color: var(--anchor-success, #28a745);
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+.anchor-message {
+  margin-bottom: 8px;
+}
+.anchor-message:last-child {
+  margin-bottom: 0;
+}
+.anchor-message-header {
   display: flex;
   align-items: baseline;
-  gap: 8px;
+  gap: 6px;
 }
-.time {
+.anchor-time {
   font-size: 11px;
-  color: #999;
+  color: var(--anchor-text-muted, #999);
 }
-.message-body {
+.anchor-edited {
+  font-size: 11px;
+  color: var(--anchor-text-muted, #999);
+  font-style: italic;
+}
+.anchor-message-body {
   margin: 2px 0 0;
   line-height: 1.4;
 }
-.input-row {
+.anchor-message-actions {
   display: flex;
-  gap: 6px;
-  padding: 8px 12px;
-  border-top: 1px solid #eee;
+  gap: 2px;
+  margin-top: 2px;
+  opacity: 0;
+  transition: opacity 0.15s;
 }
-.comment-input {
+.anchor-message:hover .anchor-message-actions {
+  opacity: 1;
+}
+.anchor-msg-action-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 12px;
+  padding: 1px 4px;
+  border-radius: 4px;
+}
+.anchor-msg-action-btn:hover {
+  background: var(--anchor-hover, #f0f0f0);
+}
+.anchor-reactions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 4px;
+}
+.anchor-reaction-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 1px 6px;
+  border: 1px solid var(--anchor-border, #ddd);
+  border-radius: 12px;
+  background: var(--anchor-bg, #fff);
+  cursor: pointer;
+  font-size: 12px;
+}
+.anchor-reaction-badge:hover {
+  background: var(--anchor-hover, #f0f0f0);
+}
+.anchor-reaction-badge.anchor-reaction-active {
+  border-color: var(--anchor-primary, #4a90d9);
+  background: var(--anchor-primary-light, #e8f0fe);
+}
+.anchor-reaction-picker {
+  display: flex;
+  gap: 2px;
+  margin-top: 4px;
+  padding: 4px;
+  border: 1px solid var(--anchor-border, #ddd);
+  border-radius: 6px;
+  background: var(--anchor-bg, #fff);
+  box-shadow: 0 2px 8px var(--anchor-shadow, rgba(0, 0, 0, 0.08));
+}
+.anchor-emoji-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 16px;
+  padding: 2px 4px;
+  border-radius: 4px;
+}
+.anchor-emoji-btn:hover {
+  background: var(--anchor-hover, #f0f0f0);
+}
+.anchor-edit-row {
+  display: flex;
+  gap: 4px;
+  margin-top: 4px;
+}
+.anchor-edit-input {
   flex: 1;
-  padding: 6px 8px;
-  border: 1px solid #ddd;
+  padding: 4px 6px;
+  border: 1px solid var(--anchor-primary, #4a90d9);
   border-radius: 4px;
   font-size: 13px;
   outline: none;
 }
-.comment-input:focus {
-  border-color: #4a90d9;
+.anchor-input-row {
+  display: flex;
+  gap: 6px;
+  padding: 8px 12px;
+  border-top: 1px solid var(--anchor-border, #eee);
 }
-.send-btn {
+.anchor-comment-input {
+  flex: 1;
+  padding: 6px 8px;
+  border: 1px solid var(--anchor-border, #ddd);
+  border-radius: 4px;
+  font-size: 13px;
+  outline: none;
+  background: var(--anchor-bg, #fff);
+  color: var(--anchor-text, #333);
+}
+.anchor-comment-input:focus {
+  border-color: var(--anchor-primary, #4a90d9);
+}
+.anchor-send-btn {
   padding: 6px 12px;
   border: none;
   border-radius: 4px;
-  background: #4a90d9;
+  background: var(--anchor-primary, #4a90d9);
   color: #fff;
   cursor: pointer;
   font-size: 13px;
 }
-.send-btn:hover {
-  background: #3a7bc8;
+.anchor-send-btn:hover {
+  background: var(--anchor-primary-hover, #3a7bc8);
 }
 </style>
