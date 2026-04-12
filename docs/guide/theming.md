@@ -16,6 +16,9 @@ All UI components use CSS custom properties (variables) for styling, making it e
 | `--anchor-hover`         | `#f0f0f0`          | Hover background               |
 | `--anchor-shadow`        | `rgba(0,0,0,0.12)` | Shadow color                   |
 | `--anchor-success`       | `#28a745`          | Success color (resolved badge) |
+| `--anchor-error-bg`      | `#fef2f2`          | Error banner background        |
+| `--anchor-error-text`    | `#dc2626`          | Error banner text color        |
+| `--anchor-error-border`  | `#fecaca`          | Error banner border color      |
 
 ## Custom Theme
 

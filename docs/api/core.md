@@ -48,6 +48,28 @@ type Thread = {
 }
 ```
 
+### `PresenceStatus`
+
+```ts
+type PresenceStatus = 'online' | 'away' | 'offline'
+```
+
+### `PresenceInfo`
+
+```ts
+type PresenceInfo = {
+  user: User
+  status: PresenceStatus
+  lastSeen: number
+}
+```
+
+### `ConnectionStatus`
+
+```ts
+type ConnectionStatus = 'online' | 'offline'
+```
+
 ### `Adapter`
 
 ```ts
@@ -70,6 +92,19 @@ interface Adapter {
 
   // Real-time (optional)
   subscribe?(anchorId: string, callback: (threads: Thread[]) => void): () => void
+
+  // Presence (optional)
+  setPresence?(anchorId: string, user: User, status: PresenceStatus): Promise<void>
+  getPresence?(anchorId: string): Promise<PresenceInfo[]>
+  subscribePresence?(anchorId: string, callback: (presence: PresenceInfo[]) => void): () => void
+
+  // Typing indicators (optional)
+  setTyping?(anchorId: string, user: User, isTyping: boolean): Promise<void>
+  subscribeTyping?(anchorId: string, callback: (users: User[]) => void): () => void
+
+  // Connection lifecycle (optional)
+  connect?(): void
+  disconnect?(): void
 }
 ```
 
@@ -95,7 +130,7 @@ const client = createClient({
 
 ### `createMemoryAdapter(user?)`
 
-In-memory adapter for demos and testing.
+In-memory adapter for demos and testing. Supports all features including real-time subscriptions, presence, and typing indicators.
 
 ```ts
 const adapter = createMemoryAdapter()
@@ -117,6 +152,61 @@ const adapter = createRestAdapter({
 ```
 
 See [Custom Adapter](/guide/custom-adapter) for the expected endpoint contract.
+
+### `createWebSocketAdapter(options)`
+
+WebSocket adapter with REST fallback for mutations and real-time subscriptions for threads, presence, and typing.
+
+```ts
+import { createWebSocketAdapter } from '@anchor-sdk/core'
+
+const adapter = createWebSocketAdapter({
+  url: 'wss://api.example.com/ws',
+  restBaseUrl: 'https://api.example.com',
+  headers: { Authorization: 'Bearer token' },
+  reconnectDelay: 1000, // optional, default: 1000ms
+  maxReconnectDelay: 30000, // optional, default: 30000ms
+})
+```
+
+| Param                       | Type                     | Required | Description                  |
+| --------------------------- | ------------------------ | -------- | ---------------------------- |
+| `options.url`               | `string`                 | Yes      | WebSocket server URL         |
+| `options.restBaseUrl`       | `string`                 | Yes      | REST API base URL            |
+| `options.headers`           | `Record<string, string>` | No       | Headers for REST requests    |
+| `options.reconnectDelay`    | `number`                 | No       | Initial reconnect delay (ms) |
+| `options.maxReconnectDelay` | `number`                 | No       | Max reconnect delay (ms)     |
+
+See [Real-Time Collaboration](/guide/real-time) for the WebSocket protocol specification.
+
+### `createOfflineQueue(options)`
+
+Wraps any adapter with an offline queue. Mutations are queued while offline and flushed when connectivity is restored.
+
+```ts
+import { createOfflineQueue, createRestAdapter } from '@anchor-sdk/core'
+
+const { adapter, goOnline, goOffline, flush, status, pending } = createOfflineQueue({
+  adapter: createRestAdapter({ baseUrl: '...' }),
+  onStatusChange: (status) => console.log(status),
+})
+```
+
+| Param                    | Type                                 | Required | Description            |
+| ------------------------ | ------------------------------------ | -------- | ---------------------- |
+| `options.adapter`        | `Adapter`                            | Yes      | Adapter to wrap        |
+| `options.onStatusChange` | `(status: ConnectionStatus) => void` | No       | Status change callback |
+
+**Returns:**
+
+| Property    | Type                  | Description                                |
+| ----------- | --------------------- | ------------------------------------------ |
+| `adapter`   | `Adapter`             | Wrapped adapter with offline support       |
+| `goOnline`  | `() => void`          | Switch to online, flush queue              |
+| `goOffline` | `() => void`          | Switch to offline, start queuing           |
+| `flush`     | `() => Promise<void>` | Manually flush queued operations           |
+| `status`    | `ConnectionStatus`    | Current status (`'online'` or `'offline'`) |
+| `pending`   | `number`              | Number of queued operations                |
 
 ## Plugin System
 

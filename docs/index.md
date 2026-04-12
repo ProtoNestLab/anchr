@@ -18,4 +18,10 @@ features:
     details: 通过 Adapter 接口对接任意后端服务
   - title: Vue 3 原生
     details: 基于 Composition API，提供 Provider、Composable 和组件
+  - title: 实时协作
+    details: WebSocket 适配器，支持在线状态、输入提示和自动重连
+  - title: 离线支持
+    details: 离线时自动排队操作，恢复连接后自动同步
+  - title: 乐观更新
+    details: UI 即时响应，失败时自动回滚
 ---

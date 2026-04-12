@@ -57,6 +57,23 @@ const client = createClient({
 })
 ```
 
+## With WebSocket (Real-Time)
+
+```ts
+import { createClient, createWebSocketAdapter } from '@anchor-sdk/core'
+
+const client = createClient({
+  adapter: createWebSocketAdapter({
+    url: 'wss://api.example.com/ws',
+    restBaseUrl: 'https://api.example.com',
+    headers: { Authorization: `Bearer ${token}` },
+  }),
+  user: { id: currentUser.id, name: currentUser.name },
+})
+```
+
+This gives you live thread updates, presence indicators, and typing indicators over WebSocket, with automatic reconnect.
+
 ## Full Example
 
 ```vue
@@ -92,6 +109,7 @@ const orders = [
 
 ## Next Steps
 
+- [Real-Time Collaboration](/guide/real-time) — WebSocket, presence, typing, offline support
 - [Custom Adapter](/guide/custom-adapter) — Connect to your own backend
 - [Plugins](/guide/plugins) — Hook into message lifecycle
 - [Theming](/guide/theming) — Customize colors and dark mode

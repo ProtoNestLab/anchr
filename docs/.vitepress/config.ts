@@ -15,6 +15,7 @@ export default defineConfig({
           text: 'Guide',
           items: [
             { text: 'Getting Started', link: '/guide/getting-started' },
+            { text: 'Real-Time Collaboration', link: '/guide/real-time' },
             { text: 'Custom Adapter', link: '/guide/custom-adapter' },
             { text: 'Plugins', link: '/guide/plugins' },
             { text: 'Theming', link: '/guide/theming' },

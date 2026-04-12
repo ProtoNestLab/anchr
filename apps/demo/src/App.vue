@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { reactive, ref, watch } from 'vue'
-import { createClient, createMemoryAdapter } from '@anchor-sdk/core'
-import type { User } from '@anchor-sdk/core'
+import { createClient, createMemoryAdapter, createOfflineQueue } from '@anchor-sdk/core'
+import type { User, ConnectionStatus } from '@anchor-sdk/core'
 import { CollabProvider } from '@anchor-sdk/vue'
 import OrderRow from './components/OrderRow.vue'
 import { DEMO_USERS } from './api/users'
@@ -22,8 +22,25 @@ watch(
   { immediate: true },
 )
 
-const adapter = createMemoryAdapter(activeUser)
-const client = createClient({ adapter, user: activeUser })
+const rawAdapter = createMemoryAdapter(activeUser)
+const offlineQueue = createOfflineQueue({
+  adapter: rawAdapter,
+  onStatusChange: (s: ConnectionStatus) => {
+    connectionStatus.value = s
+  },
+})
+const client = createClient({ adapter: offlineQueue.adapter, user: activeUser })
+
+const connectionStatus = ref<ConnectionStatus>('online')
+const isOffline = ref(false)
+
+watch(isOffline, (offline) => {
+  if (offline) {
+    offlineQueue.goOffline()
+  } else {
+    offlineQueue.goOnline()
+  }
+})
 
 const orders = [
   { id: 1, name: 'Order A', status: 'Pending', amount: '$42.00' },
@@ -47,23 +64,39 @@ function statusTagType(status: string) {
           <div class="demo-header-intro">
             <h1 class="demo-title">Orders</h1>
             <p class="demo-sub">
-              Element Plus table · Slack-style thread in an <code>ElPopover</code> only (no UI
-              package). Headless <code>useAnchor()</code>: on open <code>refresh()</code> +
-              <code>markAsRead()</code>, on close <code>hide()</code>. Pick a user top-right to post
-              and react as different people.
+              Headless <code>useAnchor()</code> + <code>usePresence()</code> with optimistic
+              updates, presence indicators, typing indicators, and offline queue. Pick a user
+              top-right to post as different people. Toggle offline mode to test queuing.
             </p>
           </div>
-          <div class="demo-user-picker">
-            <span class="demo-user-label">Acting as</span>
-            <el-select
-              v-model="selectedUserId"
-              class="demo-user-select"
-              size="default"
-              placeholder="User"
-              aria-label="Current user for comments"
-            >
-              <el-option v-for="u in DEMO_USERS" :key="u.id" :label="u.name" :value="u.id" />
-            </el-select>
+          <div class="demo-controls">
+            <div class="demo-user-picker">
+              <span class="demo-user-label">Acting as</span>
+              <el-select
+                v-model="selectedUserId"
+                class="demo-user-select"
+                size="default"
+                placeholder="User"
+                aria-label="Current user for comments"
+              >
+                <el-option v-for="u in DEMO_USERS" :key="u.id" :label="u.name" :value="u.id" />
+              </el-select>
+            </div>
+            <div class="demo-offline-toggle">
+              <el-switch v-model="isOffline" active-text="Offline" inactive-text="Online" />
+              <el-tag
+                v-if="isOffline"
+                size="small"
+                type="warning"
+                effect="dark"
+                class="demo-status-tag"
+              >
+                Queued: {{ offlineQueue.pending }}
+              </el-tag>
+              <el-tag v-else size="small" type="success" effect="dark" class="demo-status-tag">
+                Connected
+              </el-tag>
+            </div>
           </div>
         </div>
       </el-header>
@@ -137,12 +170,18 @@ body {
   border-radius: 4px;
   background: var(--el-fill-color-light);
 }
-.demo-user-picker {
+.demo-controls {
   display: flex;
   flex-shrink: 0;
-  align-items: center;
+  flex-direction: column;
+  align-items: flex-end;
   gap: 10px;
   padding-top: 2px;
+}
+.demo-user-picker {
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
 .demo-user-label {
   font-size: 13px;
@@ -152,5 +191,13 @@ body {
 }
 .demo-user-select {
   width: 168px;
+}
+.demo-offline-toggle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.demo-status-tag {
+  font-size: 11px;
 }
 </style>
