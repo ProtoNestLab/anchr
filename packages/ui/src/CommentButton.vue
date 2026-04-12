@@ -10,10 +10,15 @@ defineEmits<{
 </script>
 
 <template>
-  <button class="anchor-comment-btn" title="Open discussion" @click="$emit('click')">
+  <button
+    class="anchor-comment-btn"
+    :title="unread ? `Open discussion (${unread} unread)` : 'Open discussion'"
+    :aria-label="`Discussion${count ? ` (${count} comments)` : ''}${unread ? ` — ${unread} unread` : ''}`"
+    @click="$emit('click')"
+  >
     💬
-    <span v-if="count" class="anchor-comment-count">{{ count }}</span>
-    <span v-if="unread" class="anchor-unread-dot" />
+    <span v-if="count" class="anchor-comment-count" aria-hidden="true">{{ count }}</span>
+    <span v-if="unread" class="anchor-unread-dot" aria-hidden="true" />
   </button>
 </template>
 

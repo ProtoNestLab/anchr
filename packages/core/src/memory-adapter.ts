@@ -1,4 +1,4 @@
-import type { Adapter, Thread, Message, User } from './types'
+import type { Adapter, Thread, Message, User, PresenceInfo, PresenceStatus } from './types'
 
 let counter = 0
 function uid(): string {
@@ -13,6 +13,10 @@ export function createMemoryAdapter(user?: User): Adapter {
   const currentUser = user ?? { id: 'user-1', name: 'Anonymous' }
   const threadsByAnchor = new Map<string, Thread[]>()
   const subscribers = new Map<string, Set<(threads: Thread[]) => void>>()
+  const presenceByAnchor = new Map<string, Map<string, PresenceInfo>>()
+  const presenceSubscribers = new Map<string, Set<(presence: PresenceInfo[]) => void>>()
+  const typingByAnchor = new Map<string, Map<string, User>>()
+  const typingSubscribers = new Map<string, Set<(users: User[]) => void>>()
 
   function allThreads(): Thread[] {
     return Array.from(threadsByAnchor.values()).flat()
@@ -168,6 +172,61 @@ export function createMemoryAdapter(user?: User): Adapter {
       subscribers.get(anchorId)!.add(callback)
       return () => {
         subscribers.get(anchorId)?.delete(callback)
+      }
+    },
+
+    // Presence
+    async setPresence(anchorId: string, user: User, status: PresenceStatus) {
+      if (!presenceByAnchor.has(anchorId)) {
+        presenceByAnchor.set(anchorId, new Map())
+      }
+      const map = presenceByAnchor.get(anchorId)!
+      if (status === 'offline') {
+        map.delete(user.id)
+      } else {
+        map.set(user.id, { user: snapshotUser(user), status, lastSeen: Date.now() })
+      }
+      const presence = Array.from(map.values())
+      presenceSubscribers.get(anchorId)?.forEach((cb) => cb(presence))
+    },
+
+    async getPresence(anchorId: string) {
+      const map = presenceByAnchor.get(anchorId)
+      return map ? Array.from(map.values()) : []
+    },
+
+    subscribePresence(anchorId: string, callback: (presence: PresenceInfo[]) => void) {
+      if (!presenceSubscribers.has(anchorId)) {
+        presenceSubscribers.set(anchorId, new Set())
+      }
+      presenceSubscribers.get(anchorId)!.add(callback)
+      return () => {
+        presenceSubscribers.get(anchorId)?.delete(callback)
+      }
+    },
+
+    // Typing indicators
+    async setTyping(anchorId: string, user: User, isTyping: boolean) {
+      if (!typingByAnchor.has(anchorId)) {
+        typingByAnchor.set(anchorId, new Map())
+      }
+      const map = typingByAnchor.get(anchorId)!
+      if (isTyping) {
+        map.set(user.id, snapshotUser(user))
+      } else {
+        map.delete(user.id)
+      }
+      const users = Array.from(map.values())
+      typingSubscribers.get(anchorId)?.forEach((cb) => cb(users))
+    },
+
+    subscribeTyping(anchorId: string, callback: (users: User[]) => void) {
+      if (!typingSubscribers.has(anchorId)) {
+        typingSubscribers.set(anchorId, new Set())
+      }
+      typingSubscribers.get(anchorId)!.add(callback)
+      return () => {
+        typingSubscribers.get(anchorId)?.delete(callback)
       }
     },
   }

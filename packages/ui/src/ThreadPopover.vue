@@ -8,6 +8,8 @@ const props = defineProps<{
   threads: Thread[]
   referenceEl: HTMLElement | null
   currentUserId?: string
+  loading?: boolean
+  error?: string
 }>()
 
 const emit = defineEmits<{
@@ -114,24 +116,44 @@ function onKeydown(e: KeyboardEvent) {
 
 <template>
   <Teleport to="body">
-    <div class="anchor-popover-backdrop" @click.self="emit('close')" @keydown="onKeydown">
-      <div ref="floating" :style="floatingStyles" class="anchor-thread-popover" tabindex="-1">
+    <div
+      class="anchor-popover-backdrop"
+      role="presentation"
+      @click.self="emit('close')"
+      @keydown="onKeydown"
+    >
+      <div
+        ref="floating"
+        :style="floatingStyles"
+        class="anchor-thread-popover"
+        role="dialog"
+        aria-label="Discussion thread"
+        tabindex="-1"
+      >
         <div class="anchor-popover-header">
-          <span>Discussion</span>
-          <button class="anchor-close-btn" @click="emit('close')">✕</button>
+          <span id="anchor-dialog-title">Discussion</span>
+          <button class="anchor-close-btn" aria-label="Close discussion" @click="emit('close')">
+            ✕
+          </button>
         </div>
 
         <div class="anchor-thread-list">
-          <template v-if="threads.length === 0">
+          <div v-if="error" class="anchor-error" role="alert">
+            <span class="anchor-error-icon">⚠</span>
+            {{ error }}
+          </div>
+          <div v-if="loading" class="anchor-loading" aria-live="polite">Loading…</div>
+          <template v-if="!loading && !error && threads.length === 0">
             <p class="anchor-empty">No comments yet. Start the conversation!</p>
           </template>
           <template v-for="thread in threads" :key="thread.id">
             <div class="anchor-thread-block" :class="{ 'anchor-resolved': thread.resolved }">
-              <div class="anchor-thread-actions">
+              <div class="anchor-thread-actions" role="toolbar" aria-label="Thread actions">
                 <button
                   v-if="!thread.resolved"
                   class="anchor-action-btn"
                   title="Resolve"
+                  aria-label="Resolve thread"
                   @click="emit('resolve', thread.id)"
                 >
                   ✓
@@ -140,6 +162,7 @@ function onKeydown(e: KeyboardEvent) {
                   v-else
                   class="anchor-action-btn"
                   title="Reopen"
+                  aria-label="Reopen thread"
                   @click="emit('reopen', thread.id)"
                 >
                   ↺
@@ -147,6 +170,7 @@ function onKeydown(e: KeyboardEvent) {
                 <button
                   class="anchor-action-btn anchor-danger"
                   title="Delete thread"
+                  aria-label="Delete thread"
                   @click="emit('deleteThread', thread.id)"
                 >
                   🗑
@@ -161,15 +185,29 @@ function onKeydown(e: KeyboardEvent) {
                   <span v-if="msg.updatedAt" class="anchor-edited">(edited)</span>
                 </div>
 
-                <div v-if="editingId === msg.id" class="anchor-edit-row">
+                <div
+                  v-if="editingId === msg.id"
+                  class="anchor-edit-row"
+                  role="form"
+                  aria-label="Edit message"
+                >
                   <input
                     v-model="editContent"
                     class="anchor-edit-input edit-input"
+                    aria-label="Edit message content"
                     @keydown.enter="confirmEdit(msg.id)"
                     @keydown.escape="cancelEdit"
                   />
-                  <button class="anchor-action-btn" @click="confirmEdit(msg.id)">✓</button>
-                  <button class="anchor-action-btn" @click="cancelEdit">✕</button>
+                  <button
+                    class="anchor-action-btn"
+                    aria-label="Save edit"
+                    @click="confirmEdit(msg.id)"
+                  >
+                    ✓
+                  </button>
+                  <button class="anchor-action-btn" aria-label="Cancel edit" @click="cancelEdit">
+                    ✕
+                  </button>
                 </div>
                 <!-- eslint-disable-next-line vue/no-v-html -->
                 <p v-else class="anchor-message-body" v-html="renderMarkdown(msg.content)" />
@@ -188,10 +226,12 @@ function onKeydown(e: KeyboardEvent) {
                 </div>
 
                 <!-- Message actions -->
-                <div class="anchor-message-actions">
+                <div class="anchor-message-actions" role="toolbar" aria-label="Message actions">
                   <button
                     class="anchor-msg-action-btn"
                     title="React"
+                    aria-label="Add reaction"
+                    :aria-expanded="reactionPickerFor === msg.id"
                     @click="toggleReactionPicker(msg.id)"
                   >
                     😀
@@ -200,6 +240,7 @@ function onKeydown(e: KeyboardEvent) {
                     v-if="msg.user.id === currentUserId"
                     class="anchor-msg-action-btn"
                     title="Edit"
+                    aria-label="Edit message"
                     @click="startEdit(msg)"
                   >
                     ✏️
@@ -208,6 +249,7 @@ function onKeydown(e: KeyboardEvent) {
                     v-if="msg.user.id === currentUserId"
                     class="anchor-msg-action-btn"
                     title="Delete"
+                    aria-label="Delete message"
                     @click="emit('deleteMessage', thread.id, msg.id)"
                   >
                     🗑
@@ -215,11 +257,18 @@ function onKeydown(e: KeyboardEvent) {
                 </div>
 
                 <!-- Reaction picker -->
-                <div v-if="reactionPickerFor === msg.id" class="anchor-reaction-picker">
+                <div
+                  v-if="reactionPickerFor === msg.id"
+                  class="anchor-reaction-picker"
+                  role="listbox"
+                  aria-label="Choose a reaction"
+                >
                   <button
                     v-for="emoji in quickEmojis"
                     :key="emoji"
                     class="anchor-emoji-btn"
+                    role="option"
+                    :aria-label="`React with ${emoji}`"
                     @click="handleReaction(msg.id, emoji, msg.reactions)"
                   >
                     {{ emoji }}
@@ -230,15 +279,16 @@ function onKeydown(e: KeyboardEvent) {
           </template>
         </div>
 
-        <form class="anchor-input-row" @submit.prevent="send">
+        <form aria-label="New comment" class="anchor-input-row" @submit.prevent="send">
           <input
             ref="inputEl"
             v-model="input"
             placeholder="Write a comment…"
             class="anchor-comment-input"
+            aria-label="Comment text"
             @keydown.escape="emit('close')"
           />
-          <button type="submit" class="anchor-send-btn">Send</button>
+          <button type="submit" class="anchor-send-btn" :disabled="!input.trim()">Send</button>
         </form>
       </div>
     </div>
@@ -283,6 +333,27 @@ function onKeydown(e: KeyboardEvent) {
   flex: 1;
   overflow-y: auto;
   padding: 8px 12px;
+}
+.anchor-error {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  margin-bottom: 8px;
+  background: var(--anchor-error-bg, #fef2f2);
+  color: var(--anchor-error-text, #dc2626);
+  border: 1px solid var(--anchor-error-border, #fecaca);
+  border-radius: 6px;
+  font-size: 13px;
+}
+.anchor-error-icon {
+  flex-shrink: 0;
+}
+.anchor-loading {
+  text-align: center;
+  color: var(--anchor-text-muted, #999);
+  padding: 16px 0;
+  font-size: 13px;
 }
 .anchor-empty {
   color: var(--anchor-text-muted, #999);
