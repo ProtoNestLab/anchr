@@ -10,6 +10,7 @@
   "dependencies": {
     "@anchor-sdk/core": "workspace:*",
     "@anchor-sdk/vue": "workspace:*",
+    "@element-plus/icons-vue": "^2.3.2",
     "element-plus": "^2.13.6",
     "vue": "^3.4.0"
   },

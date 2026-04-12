@@ -15,11 +15,16 @@ A Vue 3 SDK for attaching discussion threads to any UI element.
 - **Full thread lifecycle** — create, resolve, reopen, delete threads
 - **Rich messages** — edit, delete, markdown rendering, emoji reactions
 - **User identity** — configurable current user
-- **Real-time sync** — optional `subscribe()` for live updates
+- **Real-time sync** — WebSocket adapter with auto-reconnect, or use `subscribe()` for custom transports
+- **Presence & typing** — see who's online and who's typing in real time
+- **Optimistic updates** — instant UI feedback with automatic rollback on failure
+- **Offline support** — queue mutations while offline, auto-flush on reconnect
+- **Error handling** — `loading` and `error` states with graceful UI fallbacks
+- **Accessible** — ARIA roles, labels, keyboard navigation throughout
 - **Plugin system** — lifecycle hooks for mentions, analytics, etc.
 - **Theming** — CSS custom properties with dark mode support
 - **Headless mode** — `useAnchor()` composable for fully custom UI
-- **Backend agnostic** — built-in REST adapter or implement your own
+- **Backend agnostic** — built-in REST, WebSocket, and memory adapters, or implement your own
 
 ## Installation
 
@@ -82,6 +87,14 @@ type Thread = {
   resolved: boolean
   lastActivityAt: number
 }
+
+type PresenceStatus = 'online' | 'away' | 'offline'
+
+type PresenceInfo = {
+  user: User
+  status: PresenceStatus
+  lastSeen: number
+}
 ```
 
 ### Adapter Interface
@@ -106,6 +119,19 @@ interface Adapter {
 
   // Real-time (optional)
   subscribe?(anchorId: string, callback: (threads: Thread[]) => void): () => void
+
+  // Presence (optional)
+  setPresence?(anchorId: string, user: User, status: PresenceStatus): Promise<void>
+  getPresence?(anchorId: string): Promise<PresenceInfo[]>
+  subscribePresence?(anchorId: string, callback: (presence: PresenceInfo[]) => void): () => void
+
+  // Typing indicators (optional)
+  setTyping?(anchorId: string, user: User, isTyping: boolean): Promise<void>
+  subscribeTyping?(anchorId: string, callback: (users: User[]) => void): () => void
+
+  // Connection lifecycle (optional)
+  connect?(): void
+  disconnect?(): void
 }
 ```
 
@@ -115,13 +141,23 @@ interface Adapter {
 import { createClient, createMemoryAdapter } from '@anchor-sdk/core'
 
 const client = createClient({
-  adapter: createMemoryAdapter(), // or createRestAdapter({ baseUrl, headers })
+  adapter: createMemoryAdapter(), // or createRestAdapter, createWebSocketAdapter
   user: { id: 'u1', name: 'Alice' },
   plugins: [myPlugin],
 })
 ```
 
-### REST Adapter
+### Adapters
+
+#### Memory Adapter
+
+In-memory adapter for development and testing. Supports all features including presence and typing.
+
+```ts
+const adapter = createMemoryAdapter({ id: 'u1', name: 'Alice' })
+```
+
+#### REST Adapter
 
 ```ts
 import { createRestAdapter } from '@anchor-sdk/core'
@@ -146,6 +182,44 @@ Expected endpoints:
 | `DELETE` | `/threads/:tid/messages/:mid`    | —                       | Delete message  |
 | `POST`   | `/messages/:id/reactions`        | `{ emoji }`             | Add reaction    |
 | `DELETE` | `/messages/:id/reactions/:emoji` | —                       | Remove reaction |
+
+#### WebSocket Adapter
+
+Real-time adapter using WebSocket for live updates with REST fallback for mutations.
+
+```ts
+import { createWebSocketAdapter } from '@anchor-sdk/core'
+
+const adapter = createWebSocketAdapter({
+  url: 'wss://api.example.com/ws',
+  restBaseUrl: 'https://api.example.com',
+  headers: { Authorization: `Bearer ${token}` },
+  reconnectDelay: 1000, // initial reconnect delay (default: 1000ms)
+  maxReconnectDelay: 30000, // max reconnect delay (default: 30000ms)
+})
+```
+
+Features:
+
+- REST mutations + WebSocket real-time subscriptions
+- Auto-reconnect with exponential backoff
+- Thread, presence, and typing subscriptions
+- `connect()` / `disconnect()` lifecycle methods
+
+#### Offline Queue
+
+Wrap any adapter with offline support:
+
+```ts
+import { createOfflineQueue, createRestAdapter } from '@anchor-sdk/core'
+
+const { adapter, goOnline, goOffline, status, pending } = createOfflineQueue({
+  adapter: createRestAdapter({ baseUrl: '...' }),
+  onStatusChange: (status) => console.log('Connection:', status),
+})
+
+// Mutations are queued while offline and flushed on goOnline()
+```
 
 ## Vue Integration
 
@@ -174,19 +248,21 @@ Expected endpoints:
 ### Composables
 
 ```ts
-// Full API
+// Full API with error handling and optimistic updates
 const {
-  threads,
-  createThread,
-  addMessage,
-  editMessage,
-  deleteMessage,
-  resolveThread,
-  reopenThread,
-  deleteThread,
-  addReaction,
-  removeReaction,
-  refresh,
+  threads, // Ref<Thread[]>
+  loading, // Ref<boolean>
+  error, // Ref<Error | null>
+  createThread, // (content) => Promise — optimistic
+  addMessage, // (threadId, content) => Promise — optimistic
+  editMessage, // (messageId, content) => Promise — optimistic
+  deleteMessage, // (threadId, messageId) => Promise — optimistic
+  resolveThread, // (threadId) => Promise — optimistic
+  reopenThread, // (threadId) => Promise — optimistic
+  deleteThread, // (threadId) => Promise — optimistic
+  addReaction, // (messageId, emoji) => Promise — optimistic
+  removeReaction, // (messageId, emoji) => Promise — optimistic
+  refresh, // () => Promise<void>
 } = useThreads('order-123')
 
 // Headless — all logic, zero UI
@@ -203,6 +279,17 @@ const {
   markAsRead,
   // ...plus all useThreads methods
 } = useAnchor('order-123')
+
+// Presence & typing indicators
+const {
+  presence, // Ref<PresenceInfo[]>
+  typingUsers, // Ref<User[]>
+  setOnline,
+  setAway,
+  setOffline,
+  startTyping,
+  stopTyping,
+} = usePresence('order-123')
 ```
 
 ## Theming
@@ -215,6 +302,9 @@ All UI components use CSS custom properties:
   --anchor-bg: #ffffff;
   --anchor-text: #0f172a;
   --anchor-border: #e2e8f0;
+  --anchor-error-bg: #fef2f2;
+  --anchor-error-text: #dc2626;
+  --anchor-error-border: #fecaca;
   /* See docs for full list */
 }
 
@@ -251,7 +341,7 @@ const client = createClient({ adapter, plugins: [analytics] })
 ```bash
 pnpm install
 pnpm dev          # Start demo app
-pnpm test         # Run tests
+pnpm test         # Run tests (119 tests)
 pnpm lint         # Lint
 pnpm build        # Build all packages
 pnpm size         # Check bundle sizes

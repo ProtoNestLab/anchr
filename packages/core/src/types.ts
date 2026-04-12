@@ -50,4 +50,25 @@ export interface Adapter {
 
   // Real-time (optional)
   subscribe?(anchorId: string, callback: (threads: Thread[]) => void): () => void
+
+  // Presence (optional)
+  setPresence?(anchorId: string, user: User, status: PresenceStatus): Promise<void>
+  getPresence?(anchorId: string): Promise<PresenceInfo[]>
+  subscribePresence?(anchorId: string, callback: (presence: PresenceInfo[]) => void): () => void
+
+  // Typing indicators (optional)
+  setTyping?(anchorId: string, user: User, isTyping: boolean): Promise<void>
+  subscribeTyping?(anchorId: string, callback: (users: User[]) => void): () => void
+
+  // Connection lifecycle (optional)
+  connect?(): void
+  disconnect?(): void
+}
+
+export type PresenceStatus = 'online' | 'away' | 'offline'
+
+export type PresenceInfo = {
+  user: User
+  status: PresenceStatus
+  lastSeen: number
 }

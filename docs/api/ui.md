@@ -29,6 +29,9 @@ All-in-one discussion component. Integrates Anchor + CommentButton + ThreadPopov
 - Markdown rendering
 - Keyboard navigation (Esc to close, Enter to send)
 - Real-time updates (when adapter supports it)
+- Loading and error states
+- Optimistic updates with rollback
+- Accessible (ARIA roles, labels, keyboard support)
 
 ### `<CommentButton>`
 
@@ -47,15 +50,19 @@ Floating comment button with optional count badge and unread indicator.
 | ------- | -------------- |
 | `click` | Button clicked |
 
+**Accessibility:** The button includes a dynamic `aria-label` that announces the comment count and unread count to screen readers.
+
 ### `<ThreadPopover>`
 
-Full-featured discussion popover.
+Full-featured discussion popover with error handling and loading states.
 
 ```vue
 <ThreadPopover
   :threads="threads"
   :reference-el="anchorEl"
   :current-user-id="userId"
+  :loading="loading"
+  :error="error?.message"
   @send="handleSend"
   @close="handleClose"
   @resolve="resolveThread"
@@ -73,6 +80,8 @@ Full-featured discussion popover.
 | `threads`       | `Thread[]`            | Yes      | Threads to display                    |
 | `referenceEl`   | `HTMLElement \| null` | Yes      | Positioning reference                 |
 | `currentUserId` | `string`              | No       | Current user ID (enables edit/delete) |
+| `loading`       | `boolean`             | No       | Show loading indicator                |
+| `error`         | `string`              | No       | Error message to display              |
 
 | Event            | Payload               | Description     |
 | ---------------- | --------------------- | --------------- |
@@ -86,11 +95,13 @@ Full-featured discussion popover.
 | `addReaction`    | `messageId, emoji`    | Add reaction    |
 | `removeReaction` | `messageId, emoji`    | Remove reaction |
 
+**Accessibility:** The popover uses `role="dialog"`, all buttons have `aria-label`, the reaction picker uses `role="listbox"`, and error/loading states use `role="alert"` and `aria-live="polite"`.
+
 ## Utilities
 
 ### `renderMarkdown(text)`
 
-Lightweight inline markdown renderer used by ThreadPopover. Supports bold, italic, inline code, strikethrough, links, and code blocks.
+Lightweight inline markdown renderer used by ThreadPopover. Supports bold, italic, inline code, strikethrough, links, and code blocks. All output is HTML-sanitized to prevent XSS.
 
 ```ts
 import { renderMarkdown } from '@anchor-sdk/ui'
@@ -98,3 +109,16 @@ import { renderMarkdown } from '@anchor-sdk/ui'
 renderMarkdown('**hello** *world*')
 // → '<strong>hello</strong> <em>world</em>'
 ```
+
+**Supported syntax:**
+
+| Syntax              | Output                                                        |
+| ------------------- | ------------------------------------------------------------- |
+| `**bold**`          | `<strong>bold</strong>`                                       |
+| `*italic*`          | `<em>italic</em>`                                             |
+| `` `code` ``        | `<code>code</code>`                                           |
+| `~~strike~~`        | `<del>strike</del>`                                           |
+| `[text](https://…)` | `<a href="https://…" target="_blank" rel="noopener">text</a>` |
+| ` ```block``` `     | `<pre><code>block</code></pre>`                               |
+
+Only `http://` and `https://` links are rendered — `javascript:` and other protocols are rejected.

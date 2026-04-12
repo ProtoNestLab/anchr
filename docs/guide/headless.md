@@ -1,6 +1,6 @@
 # Headless Mode
 
-Use `useAnchor()` for full control over the UI while keeping all the discussion logic.
+Use `useAnchor()` and `usePresence()` for full control over the UI while keeping all the discussion logic.
 
 ## useAnchor(anchorId)
 
@@ -10,6 +10,8 @@ import { useAnchor } from '@anchor-sdk/vue'
 const {
   // State
   threads, // Ref<Thread[]>
+  loading, // Ref<boolean>
+  error, // Ref<Error | null>
   open, // Ref<boolean>
   messageCount, // ComputedRef<number>
   unreadCount, // ComputedRef<number>
@@ -23,7 +25,7 @@ const {
   hide, // () => void
   markAsRead, // () => void
 
-  // Full thread API
+  // Full thread API (all with optimistic updates)
   createThread, // (content: string) => Promise<void>
   addMessage, // (threadId: string, content: string) => Promise<void>
   editMessage, // (messageId: string, content: string) => Promise<Message>
@@ -36,6 +38,26 @@ const {
   refresh, // () => Promise<void>
 } = useAnchor('my-element')
 ```
+
+All mutations use optimistic updates — the UI updates instantly and rolls back automatically on error.
+
+## usePresence(anchorId)
+
+```ts
+import { usePresence } from '@anchor-sdk/vue'
+
+const {
+  presence, // Ref<PresenceInfo[]> — who's online
+  typingUsers, // Ref<User[]> — who's typing
+  setOnline, // () => Promise<void>
+  setAway, // () => Promise<void>
+  setOffline, // () => Promise<void>
+  startTyping, // () => Promise<void>
+  stopTyping, // () => Promise<void>
+} = usePresence('my-element')
+```
+
+The composable auto-sets the user online on mount and offline on unmount. Requires an adapter with presence support (e.g. `createMemoryAdapter` or `createWebSocketAdapter`).
 
 ## Example: Custom Chat UI
 

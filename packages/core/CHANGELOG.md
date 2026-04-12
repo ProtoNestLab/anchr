@@ -1,5 +1,19 @@
 # @anchor-sdk/core
 
+## 1.3.0
+
+### Minor Changes
+
+- **WebSocket Adapter** — Real-time collaboration via `createWebSocketAdapter()` with REST fallback for mutations, auto-reconnect with exponential backoff, and full support for threads, presence, and typing subscriptions.
+
+- **Offline Queue** — `createOfflineQueue()` wraps any adapter to queue mutations while offline and flush them when connectivity is restored. Exposes `goOnline()`, `goOffline()`, `flush()`, `status`, and `pending` count.
+
+- **Presence & Typing Types** — New `PresenceStatus`, `PresenceInfo`, and `ConnectionStatus` types. Adapter interface extended with optional `setPresence`, `getPresence`, `subscribePresence`, `setTyping`, `subscribeTyping`, `connect`, and `disconnect` methods.
+
+- **Memory Adapter Enhancements** — `createMemoryAdapter()` now supports presence tracking, typing indicators, and real-time subscriptions for all features.
+
+- **Test Coverage** — 66 new tests covering REST adapter, WebSocket adapter, offline queue, plugin system, and memory adapter.
+
 ## 1.1.0
 
 ### Minor Changes
@@ -15,20 +29,6 @@
   - Real-time sync: optional `subscribe()` method on Adapter interface
   - Plugin system: `Plugin` interface with lifecycle hooks (`beforeCreateThread`, `afterAddMessage`, etc.)
   - REST adapter: `createRestAdapter()` for connecting to any REST backend
-
-  **Vue**
-  - `useThreads()` now exposes all new CRUD methods (edit, delete, resolve, reactions)
-  - `useAnchor()` headless composable — all discussion logic, zero UI
-  - Auto real-time subscription when adapter supports `subscribe()`
-
-  **UI**
-  - Thread resolve/reopen with visual resolved badge
-  - Message edit (inline) and delete for own messages
-  - Emoji reaction picker and toggle
-  - Markdown rendering (bold, italic, code, links, strikethrough)
-  - Unread message indicator on CommentButton
-  - Keyboard navigation (Esc to close, Enter to send)
-  - CSS custom properties theming (`--anchor-*` variables) with dark mode support
 
   ### Engineering
   - Bundle size tracking with size-limit in CI
@@ -50,14 +50,3 @@
   - `Anchor`, `Message`, `Thread` types and `Adapter` interface
   - `createClient()` factory for initializing the SDK
   - `createMemoryAdapter()` for in-memory storage (demos & testing)
-
-  **@anchor-sdk/vue**
-  - `<CollabProvider>` component for dependency injection
-  - `<Anchor>` component with hover-aware overlay slot
-  - `useThreads()` composable for thread CRUD operations
-  - `useClient()` / `provideClient()` for manual client access
-
-  **@anchor-sdk/ui**
-  - `<AnchorDiscussion>` all-in-one discussion component
-  - `<CommentButton>` floating button with count badge
-  - `<ThreadPopover>` positioned popover powered by Floating UI

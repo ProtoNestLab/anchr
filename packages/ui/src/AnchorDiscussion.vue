@@ -9,6 +9,8 @@ const props = defineProps<{ anchorId: string }>()
 const client = useClient()
 const {
   threads,
+  loading,
+  error,
   createThread,
   addMessage,
   editMessage,
@@ -73,6 +75,8 @@ function handleSend(content: string) {
     :threads="threads"
     :reference-el="anchorRef"
     :current-user-id="client.user.id"
+    :loading="loading"
+    :error="error?.message"
     @send="handleSend"
     @close="handleClose"
     @resolve="resolveThread"

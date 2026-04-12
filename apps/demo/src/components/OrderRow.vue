@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { computed, ref, nextTick, watch } from 'vue'
-import { ElMessageBox } from 'element-plus'
-import { useAnchor } from '@anchor-sdk/vue'
+import { ElMessageBox, ElIcon } from 'element-plus'
+import { WarningFilled, Loading } from '@element-plus/icons-vue'
+import { useAnchor, usePresence } from '@anchor-sdk/vue'
 import type { Message, User } from '@anchor-sdk/core'
 import { listUsers } from '../api/users'
 
@@ -12,6 +13,8 @@ const props = defineProps<{
 const {
   threads,
   open,
+  loading,
+  error,
   messageCount,
   unreadCount,
   currentUser,
@@ -27,6 +30,12 @@ const {
   addReaction,
   removeReaction,
 } = useAnchor(props.anchorId)
+
+const { presence, typingUsers, startTyping, stopTyping } = usePresence(props.anchorId)
+
+const otherPresence = computed(() => presence.value.filter((p) => p.user.id !== currentUser.id))
+
+const otherTyping = computed(() => typingUsers.value.filter((u) => u.id !== currentUser.id))
 
 const threadCount = computed(() => threads.value.length)
 const totalMessages = computed(() => threads.value.reduce((n, t) => n + t.messages.length, 0))
@@ -71,6 +80,7 @@ async function submitSend() {
   mentionActive.value = false
   const text = input.value.trim()
   if (!text) return
+  await stopTyping()
   await postToAnchor(text)
   input.value = ''
 }
@@ -101,6 +111,7 @@ async function ensureUsersLoaded() {
 }
 
 async function onComposerInput() {
+  void startTyping()
   const ta = getTextarea()
   if (!ta) return
   const cursor = ta.selectionStart ?? 0
@@ -305,7 +316,31 @@ async function onThreadMenuCommand(threadId: string, cmd: string) {
             <span class="slack-thread-anchor-label">Anchor</span>
             <code class="slack-thread-anchor-code">{{ props.anchorId }}</code>
           </p>
+          <div v-if="otherPresence.length" class="slack-presence-bar">
+            <span
+              v-for="p in otherPresence"
+              :key="p.user.id"
+              class="slack-presence-dot"
+              :class="`is-${p.status}`"
+              :title="`${p.user.name} (${p.status})`"
+            >
+              {{ p.user.name.charAt(0) }}
+            </span>
+            <span class="slack-presence-label">
+              {{ otherPresence.map((p) => p.user.name).join(', ') }} viewing
+            </span>
+          </div>
         </header>
+
+        <div v-if="error" class="slack-error-banner" role="alert">
+          <el-icon><WarningFilled /></el-icon>
+          {{ error.message }}
+        </div>
+
+        <div v-if="loading" class="slack-loading-bar">
+          <el-icon class="is-loading"><Loading /></el-icon>
+          Loading…
+        </div>
 
         <el-scrollbar max-height="380px" class="slack-thread-scroll">
           <div class="slack-thread-body">
@@ -466,6 +501,14 @@ async function onThreadMenuCommand(threadId: string, cmd: string) {
             </section>
           </div>
         </el-scrollbar>
+
+        <div v-if="otherTyping.length" class="slack-typing-bar">
+          <span class="slack-typing-dots"><span /><span /><span /></span>
+          <span class="slack-typing-text">
+            {{ otherTyping.map((u) => u.name).join(', ') }}
+            {{ otherTyping.length === 1 ? 'is' : 'are' }} typing…
+          </span>
+        </div>
 
         <footer class="slack-composer">
           <div class="slack-composer-input-wrap">
@@ -638,6 +681,118 @@ async function onThreadMenuCommand(threadId: string, cmd: string) {
   color: var(--el-text-color-regular, #303133);
   background: transparent;
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+
+.slack-presence-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 10px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.65);
+  border: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.slack-presence-dot {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 700;
+  color: #fff;
+  background: #909399;
+  flex-shrink: 0;
+}
+.slack-presence-dot.is-online {
+  background: #67c23a;
+}
+.slack-presence-dot.is-away {
+  background: #e6a23c;
+}
+.slack-presence-dot.is-offline {
+  background: #909399;
+}
+
+.slack-presence-label {
+  font-size: 12px;
+  color: var(--el-text-color-secondary, #909399);
+}
+
+.slack-error-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  margin: 0;
+  font-size: 13px;
+  color: var(--el-color-danger, #f56c6c);
+  background: var(--el-color-danger-light-9, #fef0f0);
+  border-bottom: 1px solid var(--el-color-danger-light-5, #fab6b6);
+}
+
+.slack-loading-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  font-size: 13px;
+  color: var(--el-text-color-secondary, #909399);
+  background: var(--el-fill-color-lighter, #fafafa);
+  border-bottom: 1px solid var(--el-border-color-lighter, #e8e8e8);
+}
+
+.slack-typing-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 16px 2px;
+  min-height: 24px;
+  background: var(--el-bg-color, #fff);
+}
+
+.slack-typing-text {
+  font-size: 12px;
+  color: var(--el-text-color-secondary, #909399);
+  font-style: italic;
+}
+
+.slack-typing-dots {
+  display: inline-flex;
+  gap: 3px;
+  align-items: center;
+}
+.slack-typing-dots span {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--el-text-color-secondary, #909399);
+  animation: slack-typing-bounce 1.4s infinite ease-in-out both;
+}
+.slack-typing-dots span:nth-child(1) {
+  animation-delay: 0s;
+}
+.slack-typing-dots span:nth-child(2) {
+  animation-delay: 0.16s;
+}
+.slack-typing-dots span:nth-child(3) {
+  animation-delay: 0.32s;
+}
+
+@keyframes slack-typing-bounce {
+  0%,
+  80%,
+  100% {
+    transform: scale(0.6);
+    opacity: 0.4;
+  }
+  40% {
+    transform: scale(1);
+    opacity: 1;
+  }
 }
 
 .slack-thread-scroll {
