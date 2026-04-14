@@ -19,22 +19,23 @@ const {
   currentUser, // User
 
   // Quick actions
-  send, // (content: string) => Promise<void>
+  send, // (content: string, options?: MessageOptions) => Promise<void>
   toggle, // () => void
   show, // () => void
   hide, // () => void
   markAsRead, // () => void
 
   // Full thread API (all with optimistic updates)
-  createThread, // (content: string) => Promise<void>
-  addMessage, // (threadId: string, content: string) => Promise<void>
-  editMessage, // (messageId: string, content: string) => Promise<Message>
-  deleteMessage, // (threadId: string, messageId: string) => Promise<void>
-  resolveThread, // (threadId: string) => Promise<void>
-  reopenThread, // (threadId: string) => Promise<void>
-  deleteThread, // (threadId: string) => Promise<void>
-  addReaction, // (messageId: string, emoji: string) => Promise<void>
-  removeReaction, // (messageId: string, emoji: string) => Promise<void>
+  createThread, // (content, options?) => Promise<void>
+  addMessage, // (threadId, content, options?) => Promise<void>
+  editMessage, // (messageId, content) => Promise<Message>
+  deleteMessage, // (threadId, messageId) => Promise<void>
+  resolveThread, // (threadId) => Promise<void>
+  reopenThread, // (threadId) => Promise<void>
+  deleteThread, // (threadId) => Promise<void>
+  addReaction, // (messageId, emoji) => Promise<void>
+  removeReaction, // (messageId, emoji) => Promise<void>
+  uploadAttachment, // (file: File) => Promise<Attachment | undefined>
   refresh, // () => Promise<void>
 } = useAnchor('my-element')
 ```
@@ -58,6 +59,64 @@ const {
 ```
 
 The composable auto-sets the user online on mount and offline on unmount. Requires an adapter with presence support (e.g. `createMemoryAdapter` or `createWebSocketAdapter`).
+
+## useMentions(options)
+
+Headless `@mention` autocomplete. Drives your own suggestion popup using any text input.
+
+```ts
+import { useMentions } from '@anchor-sdk/vue'
+import { ref } from 'vue'
+
+const text = ref('')
+const m = useMentions({
+  text,
+  resolveUsers: () => teamMembers, // sync or async
+  filter: (u) => u.id !== currentUser.id,
+})
+
+function onInput(e: Event) {
+  const el = e.target as HTMLTextAreaElement
+  m.onInput(el.selectionStart ?? el.value.length)
+}
+</script>
+
+<template>
+  <textarea v-model="text" @input="onInput" />
+  <ul v-if="m.active.value">
+    <li
+      v-for="(u, i) in m.suggestions.value"
+      :key="u.id"
+      :class="{ active: i === m.selectedIndex.value }"
+      @mousedown.prevent="
+        {
+          const r = m.select(textarea.selectionStart ?? 0, u)
+          if (r) text = r.text
+        }
+      "
+    >
+      @{{ u.name }}
+    </li>
+  </ul>
+</template>
+```
+
+The composable only manages state — you own the rendering, positioning, and input binding.
+
+## Attachments
+
+Enable file/image attachments by implementing `uploadAttachment` on your adapter, then:
+
+```ts
+const { uploadAttachment, send } = useAnchor('my-element')
+
+async function onFile(file: File) {
+  const att = await uploadAttachment(file)
+  if (att) await send('see attached', { attachments: [att] })
+}
+```
+
+If the adapter doesn't implement attachments, `uploadAttachment` returns `undefined` and sets `error`.
 
 ## Example: Custom Chat UI
 

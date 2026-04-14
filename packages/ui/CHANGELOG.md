@@ -1,5 +1,17 @@
 # @anchor-sdk/ui
 
+## 1.4.0
+
+### Minor Changes
+
+- **`<MarkdownEditor>`** — New composer component replacing the plain textarea. Write/preview tabs, a small formatting toolbar (bold, italic, strike, code, link), and keyboard shortcuts: ⌘B / ⌘I wrap the current selection, ⌘K inserts a link. Exposes `focus()` and the underlying `textarea` for cursor-aware integrations (like mentions).
+
+- **`<VirtualList>`** — Generic virtual-scrolling list with dynamic row heights (measured via `ResizeObserver`). Props: `items`, `estimatedHeight`, `overscan`, `getKey`. Exposes `scrollToBottom()` and `scrollToIndex()`.
+
+- **`<ThreadPopover>` / `<AnchorDiscussion>`** — New props: `mentionUsers` (drives `useMentions` autocomplete), `uploadAttachment` (enables file/image attachments; the button is hidden when the adapter doesn't implement it), `virtualize` (default `true`) and `virtualizeThreshold` (default `50`). Image attachments render as thumbnails; other files render as download chips. `send` now emits `(content, { attachments? })`.
+
+- **`<AnchorDiscussion>`** — Automatically passes `client.adapter.uploadAttachment` through when the adapter supports attachments.
+
 ## 1.3.0
 
 ### Minor Changes

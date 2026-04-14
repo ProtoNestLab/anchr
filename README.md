@@ -13,7 +13,10 @@ A Vue 3 SDK for attaching discussion threads to any UI element.
 
 - **Anchor anything** — wrap any UI element to make it discussable
 - **Full thread lifecycle** — create, resolve, reopen, delete threads
-- **Rich messages** — edit, delete, markdown rendering, emoji reactions
+- **Rich messages** — markdown editor with preview, edit, delete, emoji reactions
+- **Attachments** — file/image uploads via adapter extension point
+- **@mentions** — autocomplete users while typing, with a headless `useMentions` composable
+- **Virtual scrolling** — handle long threads without jank
 - **User identity** — configurable current user
 - **Real-time sync** — WebSocket adapter with auto-reconnect, or use `subscribe()` for custom transports
 - **Presence & typing** — see who's online and who's typing in real time
@@ -71,6 +74,16 @@ const client = createClient({
 type User = { id: string; name: string; avatar?: string }
 type Reaction = { emoji: string; userId: string }
 
+type Attachment = {
+  id: string
+  name: string
+  url: string
+  mimeType: string
+  size: number
+  width?: number
+  height?: number
+}
+
 type Message = {
   id: string
   content: string
@@ -78,6 +91,7 @@ type Message = {
   updatedAt?: number
   user: User
   reactions: Reaction[]
+  attachments?: Attachment[]
 }
 
 type Thread = {
@@ -100,22 +114,29 @@ type PresenceInfo = {
 ### Adapter Interface
 
 ```ts
+interface MessageOptions {
+  attachments?: Attachment[]
+}
+
 interface Adapter {
   // Threads
   getThreads(anchorId: string): Promise<Thread[]>
-  createThread(anchorId: string, content: string): Promise<Thread>
+  createThread(anchorId: string, content: string, options?: MessageOptions): Promise<Thread>
   resolveThread(threadId: string): Promise<Thread>
   reopenThread(threadId: string): Promise<Thread>
   deleteThread(threadId: string): Promise<void>
 
   // Messages
-  addMessage(threadId: string, content: string): Promise<Message>
+  addMessage(threadId: string, content: string, options?: MessageOptions): Promise<Message>
   editMessage(messageId: string, content: string): Promise<Message>
   deleteMessage(threadId: string, messageId: string): Promise<void>
 
   // Reactions
   addReaction(messageId: string, emoji: string): Promise<Message>
   removeReaction(messageId: string, emoji: string): Promise<Message>
+
+  // Attachments (optional)
+  uploadAttachment?(file: File): Promise<Attachment>
 
   // Real-time (optional)
   subscribe?(anchorId: string, callback: (threads: Thread[]) => void): () => void
@@ -170,18 +191,19 @@ const adapter = createRestAdapter({
 
 Expected endpoints:
 
-| Method   | Endpoint                         | Body                    | Description     |
-| -------- | -------------------------------- | ----------------------- | --------------- |
-| `GET`    | `/threads?anchorId=:id`          | —                       | List threads    |
-| `POST`   | `/threads`                       | `{ anchorId, content }` | Create thread   |
-| `PATCH`  | `/threads/:id/resolve`           | —                       | Resolve thread  |
-| `PATCH`  | `/threads/:id/reopen`            | —                       | Reopen thread   |
-| `DELETE` | `/threads/:id`                   | —                       | Delete thread   |
-| `POST`   | `/threads/:id/messages`          | `{ content }`           | Add message     |
-| `PATCH`  | `/messages/:id`                  | `{ content }`           | Edit message    |
-| `DELETE` | `/threads/:tid/messages/:mid`    | —                       | Delete message  |
-| `POST`   | `/messages/:id/reactions`        | `{ emoji }`             | Add reaction    |
-| `DELETE` | `/messages/:id/reactions/:emoji` | —                       | Remove reaction |
+| Method   | Endpoint                         | Body                                  | Description                              |
+| -------- | -------------------------------- | ------------------------------------- | ---------------------------------------- |
+| `GET`    | `/threads?anchorId=:id`          | —                                     | List threads                             |
+| `POST`   | `/threads`                       | `{ anchorId, content, attachments? }` | Create thread                            |
+| `PATCH`  | `/threads/:id/resolve`           | —                                     | Resolve thread                           |
+| `PATCH`  | `/threads/:id/reopen`            | —                                     | Reopen thread                            |
+| `DELETE` | `/threads/:id`                   | —                                     | Delete thread                            |
+| `POST`   | `/threads/:id/messages`          | `{ content, attachments? }`           | Add message                              |
+| `PATCH`  | `/messages/:id`                  | `{ content }`                         | Edit message                             |
+| `DELETE` | `/threads/:tid/messages/:mid`    | —                                     | Delete message                           |
+| `POST`   | `/messages/:id/reactions`        | `{ emoji }`                           | Add reaction                             |
+| `DELETE` | `/messages/:id/reactions/:emoji` | —                                     | Remove reaction                          |
+| `POST`   | `/attachments`                   | `FormData { file }`                   | Upload attachment (returns `Attachment`) |
 
 #### WebSocket Adapter
 
@@ -232,7 +254,12 @@ const { adapter, goOnline, goOffline, status, pending } = createOfflineQueue({
 </CollabProvider>
 
 <!-- All-in-one (easiest) -->
-<AnchorDiscussion anchor-id="order-123">
+<AnchorDiscussion
+  anchor-id="order-123"
+  :mention-users="teamMembers"
+  :virtualize="true"
+  :virtualize-threshold="50"
+>
   <div>Order #123</div>
 </AnchorDiscussion>
 
@@ -253,8 +280,8 @@ const {
   threads, // Ref<Thread[]>
   loading, // Ref<boolean>
   error, // Ref<Error | null>
-  createThread, // (content) => Promise — optimistic
-  addMessage, // (threadId, content) => Promise — optimistic
+  createThread, // (content, options?) => Promise — optimistic
+  addMessage, // (threadId, content, options?) => Promise — optimistic
   editMessage, // (messageId, content) => Promise — optimistic
   deleteMessage, // (threadId, messageId) => Promise — optimistic
   resolveThread, // (threadId) => Promise — optimistic
@@ -262,8 +289,21 @@ const {
   deleteThread, // (threadId) => Promise — optimistic
   addReaction, // (messageId, emoji) => Promise — optimistic
   removeReaction, // (messageId, emoji) => Promise — optimistic
+  uploadAttachment, // (file) => Promise<Attachment | undefined>
   refresh, // () => Promise<void>
 } = useThreads('order-123')
+
+// @mention autocomplete (headless)
+const text = ref('')
+const mentions = useMentions({
+  text,
+  resolveUsers: () => [
+    { id: 'u1', name: 'Alice' },
+    { id: 'u2', name: 'Bob' },
+  ],
+})
+// mentions.onInput(cursor), mentions.moveUp/moveDown, mentions.select(cursor)
+// expose: active, query, suggestions, selectedIndex, loading
 
 // Headless — all logic, zero UI
 const {
@@ -341,7 +381,7 @@ const client = createClient({ adapter, plugins: [analytics] })
 ```bash
 pnpm install
 pnpm dev          # Start demo app
-pnpm test         # Run tests (119 tests)
+pnpm test         # Run tests (139 tests)
 pnpm lint         # Lint
 pnpm build        # Build all packages
 pnpm size         # Check bundle sizes

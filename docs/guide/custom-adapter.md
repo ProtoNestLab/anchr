@@ -21,18 +21,19 @@ const client = createClient({
 
 The REST adapter expects the following endpoints:
 
-| Method   | Endpoint                         | Body                    | Returns    | Description                |
-| -------- | -------------------------------- | ----------------------- | ---------- | -------------------------- |
-| `GET`    | `/threads?anchorId=:id`          | —                       | `Thread[]` | List threads for an anchor |
-| `POST`   | `/threads`                       | `{ anchorId, content }` | `Thread`   | Create a new thread        |
-| `PATCH`  | `/threads/:id/resolve`           | —                       | `Thread`   | Mark thread as resolved    |
-| `PATCH`  | `/threads/:id/reopen`            | —                       | `Thread`   | Reopen a resolved thread   |
-| `DELETE` | `/threads/:id`                   | —                       | —          | Delete a thread            |
-| `POST`   | `/threads/:id/messages`          | `{ content }`           | `Message`  | Add message to thread      |
-| `PATCH`  | `/messages/:id`                  | `{ content }`           | `Message`  | Edit a message             |
-| `DELETE` | `/threads/:tid/messages/:mid`    | —                       | —          | Delete a message           |
-| `POST`   | `/messages/:id/reactions`        | `{ emoji }`             | `Message`  | Add emoji reaction         |
-| `DELETE` | `/messages/:id/reactions/:emoji` | —                       | `Message`  | Remove emoji reaction      |
+| Method   | Endpoint                         | Body                                  | Returns      | Description                |
+| -------- | -------------------------------- | ------------------------------------- | ------------ | -------------------------- |
+| `GET`    | `/threads?anchorId=:id`          | —                                     | `Thread[]`   | List threads for an anchor |
+| `POST`   | `/threads`                       | `{ anchorId, content, attachments? }` | `Thread`     | Create a new thread        |
+| `PATCH`  | `/threads/:id/resolve`           | —                                     | `Thread`     | Mark thread as resolved    |
+| `PATCH`  | `/threads/:id/reopen`            | —                                     | `Thread`     | Reopen a resolved thread   |
+| `DELETE` | `/threads/:id`                   | —                                     | —            | Delete a thread            |
+| `POST`   | `/threads/:id/messages`          | `{ content, attachments? }`           | `Message`    | Add message to thread      |
+| `PATCH`  | `/messages/:id`                  | `{ content }`                         | `Message`    | Edit a message             |
+| `DELETE` | `/threads/:tid/messages/:mid`    | —                                     | —            | Delete a message           |
+| `POST`   | `/messages/:id/reactions`        | `{ emoji }`                           | `Message`    | Add emoji reaction         |
+| `DELETE` | `/messages/:id/reactions/:emoji` | —                                     | `Message`    | Remove emoji reaction      |
+| `POST`   | `/attachments`                   | `FormData { file }`                   | `Attachment` | Upload an attachment       |
 
 ### Response Schemas
 
@@ -65,19 +66,22 @@ For full control, implement the `Adapter` interface directly:
 interface Adapter {
   // Threads
   getThreads(anchorId: string): Promise<Thread[]>
-  createThread(anchorId: string, content: string): Promise<Thread>
+  createThread(anchorId: string, content: string, options?: MessageOptions): Promise<Thread>
   resolveThread(threadId: string): Promise<Thread>
   reopenThread(threadId: string): Promise<Thread>
   deleteThread(threadId: string): Promise<void>
 
   // Messages
-  addMessage(threadId: string, content: string): Promise<Message>
+  addMessage(threadId: string, content: string, options?: MessageOptions): Promise<Message>
   editMessage(messageId: string, content: string): Promise<Message>
   deleteMessage(threadId: string, messageId: string): Promise<void>
 
   // Reactions
   addReaction(messageId: string, emoji: string): Promise<Message>
   removeReaction(messageId: string, emoji: string): Promise<Message>
+
+  // Attachments (optional)
+  uploadAttachment?(file: File): Promise<Attachment>
 
   // Real-time (optional)
   subscribe?(anchorId: string, callback: (threads: Thread[]) => void): () => void
@@ -177,8 +181,34 @@ const myAdapter: Adapter = {
     es.onmessage = (e) => callback(JSON.parse(e.data))
     return () => es.close()
   },
+
+  // Optional: file/image uploads
+  async uploadAttachment(file) {
+    const body = new FormData()
+    body.append('file', file)
+    const res = await fetch('/api/attachments', { method: 'POST', body })
+    return res.json() // must match the Attachment schema
+  },
 }
 ```
+
+## Attachments
+
+To enable attachments in the default UI, implement `uploadAttachment`. The method receives a `File` and must return an `Attachment`:
+
+```ts
+type Attachment = {
+  id: string
+  name: string
+  url: string
+  mimeType: string
+  size: number
+  width?: number // images only
+  height?: number // images only
+}
+```
+
+Store the file (e.g. S3, Cloudinary, or a `/uploads` directory) and return a URL that browsers can load directly. When the adapter does not implement `uploadAttachment`, the UI hides the attachment button and `useThreads().uploadAttachment()` sets an error instead of throwing.
 
 ## Usage
 

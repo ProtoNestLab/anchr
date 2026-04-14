@@ -1,5 +1,15 @@
 # @anchor-sdk/vue
 
+## 1.4.0
+
+### Minor Changes
+
+- **`useThreads().uploadAttachment(file)`** — Delegates to the adapter's `uploadAttachment` with error-state fallback when the adapter doesn't implement it. `createThread` and `addMessage` now accept an optional `MessageOptions` argument (forwarded into optimistic updates).
+
+- **`useMentions(options)`** — Headless `@mention` autocomplete composable. Tracks the current `@query` before the cursor and exposes filtered user suggestions, keyboard navigation (`moveUp` / `moveDown`), and a `select()` that returns the rewritten text and new cursor offset. Supports sync or async `resolveUsers` and an optional `filter` (e.g. exclude the current user).
+
+- **`useAnchor().send(content, options?)`** — Forwards `MessageOptions` (e.g. `attachments`) to the underlying `createThread`. Re-exports `uploadAttachment` from `useThreads`.
+
 ## 1.3.0
 
 ### Minor Changes

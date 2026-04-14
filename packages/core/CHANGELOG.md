@@ -1,5 +1,15 @@
 # @anchor-sdk/core
 
+## 1.4.0
+
+### Minor Changes
+
+- **Attachments** — New `Attachment` and `MessageOptions` types. `Adapter` interface extended with optional `uploadAttachment(file)`; `createThread` and `addMessage` accept an optional `MessageOptions` with `attachments`.
+
+- **Memory Adapter** — `createMemoryAdapter()` implements `uploadAttachment` by encoding files as data URLs (with image dimension detection, where available) so the adapter remains self-contained for demos and tests.
+
+- **REST & WebSocket Adapters** — `uploadAttachment` posts `FormData` to `/attachments`; `createThread` / `addMessage` forward `attachments` in the request body. See the custom-adapter guide for the endpoint contract.
+
 ## 1.3.0
 
 ### Minor Changes

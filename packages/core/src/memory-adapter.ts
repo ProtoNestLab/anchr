@@ -1,4 +1,13 @@
-import type { Adapter, Thread, Message, User, PresenceInfo, PresenceStatus } from './types'
+import type {
+  Adapter,
+  Thread,
+  Message,
+  User,
+  PresenceInfo,
+  PresenceStatus,
+  Attachment,
+  MessageOptions,
+} from './types'
 
 let counter = 0
 function uid(): string {
@@ -48,7 +57,7 @@ export function createMemoryAdapter(user?: User): Adapter {
       return threadsByAnchor.get(anchorId) ?? []
     },
 
-    async createThread(anchorId, content) {
+    async createThread(anchorId, content, options?: MessageOptions) {
       const now = Date.now()
       const thread: Thread = {
         id: uid(),
@@ -60,6 +69,7 @@ export function createMemoryAdapter(user?: User): Adapter {
             createdAt: now,
             user: snapshotUser(currentUser),
             reactions: [],
+            ...(options?.attachments?.length ? { attachments: options.attachments } : {}),
           },
         ],
         resolved: false,
@@ -103,7 +113,7 @@ export function createMemoryAdapter(user?: User): Adapter {
     },
 
     // Messages
-    async addMessage(threadId, content) {
+    async addMessage(threadId, content, options?: MessageOptions) {
       const thread = findThread(threadId)
       if (!thread) throw new Error(`Thread ${threadId} not found`)
       const now = Date.now()
@@ -113,6 +123,7 @@ export function createMemoryAdapter(user?: User): Adapter {
         createdAt: now,
         user: snapshotUser(currentUser),
         reactions: [],
+        ...(options?.attachments?.length ? { attachments: options.attachments } : {}),
       }
       thread.messages.push(message)
       thread.lastActivityAt = now
@@ -229,5 +240,54 @@ export function createMemoryAdapter(user?: User): Adapter {
         typingSubscribers.get(anchorId)?.delete(callback)
       }
     },
+
+    // Attachments: encode as data URL so the in-memory adapter is self-contained
+    async uploadAttachment(file: File): Promise<Attachment> {
+      const url = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader()
+        reader.onerror = () => reject(reader.error)
+        reader.onload = () => resolve(reader.result as string)
+        reader.readAsDataURL(file)
+      })
+      let width: number | undefined
+      let height: number | undefined
+      if (file.type.startsWith('image/')) {
+        try {
+          const dims = await loadImageSize(url)
+          width = dims.width
+          height = dims.height
+        } catch {
+          /* fallback: dimensions unknown */
+        }
+      }
+      return {
+        id: uid(),
+        name: file.name,
+        url,
+        mimeType: file.type || 'application/octet-stream',
+        size: file.size,
+        ...(width !== undefined && height !== undefined ? { width, height } : {}),
+      }
+    },
   }
+}
+
+function loadImageSize(url: string): Promise<{ width: number; height: number }> {
+  return new Promise((resolve, reject) => {
+    if (typeof Image === 'undefined') {
+      reject(new Error('Image constructor unavailable'))
+      return
+    }
+    const img = new Image()
+    const timer = setTimeout(() => reject(new Error('Image load timeout')), 500)
+    img.onload = () => {
+      clearTimeout(timer)
+      resolve({ width: img.naturalWidth, height: img.naturalHeight })
+    }
+    img.onerror = () => {
+      clearTimeout(timer)
+      reject(new Error('Failed to load image'))
+    }
+    img.src = url
+  })
 }

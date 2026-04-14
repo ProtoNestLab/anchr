@@ -1,4 +1,5 @@
 import { ref, computed } from 'vue'
+import type { MessageOptions } from '@anchor-sdk/core'
 import { useThreads } from './useThreads'
 import { useClient } from './provider'
 
@@ -43,11 +44,11 @@ export function useAnchor(anchorId: string) {
     lastSeenCount.value = messageCount.value
   }
 
-  async function send(content: string) {
+  async function send(content: string, options?: MessageOptions) {
     if (threadApi.threads.value.length > 0) {
-      await threadApi.addMessage(threadApi.threads.value[0].id, content)
+      await threadApi.addMessage(threadApi.threads.value[0].id, content, options)
     } else {
-      await threadApi.createThread(content)
+      await threadApi.createThread(content, options)
     }
   }
 

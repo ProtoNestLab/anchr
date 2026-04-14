@@ -14,6 +14,16 @@ export type Reaction = {
   userId: string
 }
 
+export type Attachment = {
+  id: string
+  name: string
+  url: string
+  mimeType: string
+  size: number
+  width?: number
+  height?: number
+}
+
 export type Message = {
   id: string
   content: string
@@ -21,6 +31,7 @@ export type Message = {
   updatedAt?: number
   user: User
   reactions: Reaction[]
+  attachments?: Attachment[]
 }
 
 export type Thread = {
@@ -31,22 +42,29 @@ export type Thread = {
   lastActivityAt: number
 }
 
+export type MessageOptions = {
+  attachments?: Attachment[]
+}
+
 export interface Adapter {
   // Threads
   getThreads(anchorId: string): Promise<Thread[]>
-  createThread(anchorId: string, content: string): Promise<Thread>
+  createThread(anchorId: string, content: string, options?: MessageOptions): Promise<Thread>
   resolveThread(threadId: string): Promise<Thread>
   reopenThread(threadId: string): Promise<Thread>
   deleteThread(threadId: string): Promise<void>
 
   // Messages
-  addMessage(threadId: string, content: string): Promise<Message>
+  addMessage(threadId: string, content: string, options?: MessageOptions): Promise<Message>
   editMessage(messageId: string, content: string): Promise<Message>
   deleteMessage(threadId: string, messageId: string): Promise<void>
 
   // Reactions
   addReaction(messageId: string, emoji: string): Promise<Message>
   removeReaction(messageId: string, emoji: string): Promise<Message>
+
+  // Attachments (optional)
+  uploadAttachment?(file: File): Promise<Attachment>
 
   // Real-time (optional)
   subscribe?(anchorId: string, callback: (threads: Thread[]) => void): () => void

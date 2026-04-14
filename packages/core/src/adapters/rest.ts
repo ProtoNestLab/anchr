@@ -1,4 +1,4 @@
-import type { Adapter, Thread, Message } from '../types'
+import type { Adapter, Thread, Message, Attachment, MessageOptions } from '../types'
 
 export interface RestAdapterOptions {
   /** Base URL of the API, e.g. "https://api.example.com" */
@@ -44,10 +44,10 @@ export function createRestAdapter(options: RestAdapterOptions): Adapter {
     getThreads: (anchorId) =>
       request<Thread[]>(`/threads?anchorId=${encodeURIComponent(anchorId)}`, options),
 
-    createThread: (anchorId, content) =>
+    createThread: (anchorId, content, opts?: MessageOptions) =>
       request<Thread>('/threads', options, {
         method: 'POST',
-        body: JSON.stringify({ anchorId, content }),
+        body: JSON.stringify({ anchorId, content, attachments: opts?.attachments }),
       }),
 
     resolveThread: (threadId) =>
@@ -59,10 +59,10 @@ export function createRestAdapter(options: RestAdapterOptions): Adapter {
     deleteThread: (threadId) =>
       request<void>(`/threads/${threadId}`, options, { method: 'DELETE' }),
 
-    addMessage: (threadId, content) =>
+    addMessage: (threadId, content, opts?: MessageOptions) =>
       request<Message>(`/threads/${threadId}/messages`, options, {
         method: 'POST',
-        body: JSON.stringify({ content }),
+        body: JSON.stringify({ content, attachments: opts?.attachments }),
       }),
 
     editMessage: (messageId, content) =>
@@ -86,5 +86,17 @@ export function createRestAdapter(options: RestAdapterOptions): Adapter {
       request<Message>(`/messages/${messageId}/reactions/${encodeURIComponent(emoji)}`, options, {
         method: 'DELETE',
       }),
+
+    async uploadAttachment(file: File): Promise<Attachment> {
+      const form = new FormData()
+      form.append('file', file)
+      const res = await fetch(`${options.baseUrl}/attachments`, {
+        method: 'POST',
+        headers: { ...options.headers },
+        body: form,
+      })
+      if (!res.ok) throw new Error(`REST adapter: ${res.status} ${res.statusText}`)
+      return res.json()
+    },
   }
 }

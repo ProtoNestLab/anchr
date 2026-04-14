@@ -1,4 +1,12 @@
-import type { Adapter, Thread, Message, User, PresenceInfo } from '../types'
+import type {
+  Adapter,
+  Thread,
+  Message,
+  User,
+  PresenceInfo,
+  Attachment,
+  MessageOptions,
+} from '../types'
 
 export interface WebSocketAdapterOptions {
   /** WebSocket server URL, e.g. "wss://api.example.com/ws" */
@@ -146,10 +154,10 @@ export function createWebSocketAdapter(options: WebSocketAdapterOptions): Adapte
     getThreads: (anchorId) =>
       request<Thread[]>(`/threads?anchorId=${encodeURIComponent(anchorId)}`, restOpts),
 
-    createThread: (anchorId, content) =>
+    createThread: (anchorId, content, opts?: MessageOptions) =>
       request<Thread>('/threads', restOpts, {
         method: 'POST',
-        body: JSON.stringify({ anchorId, content }),
+        body: JSON.stringify({ anchorId, content, attachments: opts?.attachments }),
       }),
 
     resolveThread: (threadId) =>
@@ -161,11 +169,23 @@ export function createWebSocketAdapter(options: WebSocketAdapterOptions): Adapte
     deleteThread: (threadId) =>
       request<void>(`/threads/${threadId}`, restOpts, { method: 'DELETE' }),
 
-    addMessage: (threadId, content) =>
+    addMessage: (threadId, content, opts?: MessageOptions) =>
       request<Message>(`/threads/${threadId}/messages`, restOpts, {
         method: 'POST',
-        body: JSON.stringify({ content }),
+        body: JSON.stringify({ content, attachments: opts?.attachments }),
       }),
+
+    async uploadAttachment(file: File): Promise<Attachment> {
+      const form = new FormData()
+      form.append('file', file)
+      const res = await fetch(`${restOpts.restBaseUrl}/attachments`, {
+        method: 'POST',
+        headers: { ...restOpts.headers },
+        body: form,
+      })
+      if (!res.ok) throw new Error(`WebSocket adapter REST: ${res.status} ${res.statusText}`)
+      return res.json()
+    },
 
     editMessage: (messageId, content) =>
       request<Message>(`/messages/${messageId}`, restOpts, {

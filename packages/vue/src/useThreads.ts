@@ -1,5 +1,5 @@
 import { ref, onMounted, onUnmounted } from 'vue'
-import type { Thread, Message } from '@anchor-sdk/core'
+import type { Thread, Message, Attachment, MessageOptions } from '@anchor-sdk/core'
 import { useClient } from './provider'
 
 export function useThreads(anchorId: string) {
@@ -48,7 +48,7 @@ export function useThreads(anchorId: string) {
     loading.value = false
   }
 
-  async function createThread(content: string) {
+  async function createThread(content: string, options?: MessageOptions) {
     const now = Date.now()
     const tempId = `temp_${now}`
     const optimisticThread: Thread = {
@@ -61,6 +61,7 @@ export function useThreads(anchorId: string) {
           createdAt: now,
           user: { ...client.user },
           reactions: [],
+          ...(options?.attachments?.length ? { attachments: options.attachments } : {}),
         },
       ],
       resolved: false,
@@ -72,13 +73,13 @@ export function useThreads(anchorId: string) {
         threads.value = [...threads.value, optimisticThread]
       },
       async () => {
-        await client.adapter.createThread(anchorId, content)
+        await client.adapter.createThread(anchorId, content, options)
         await refresh()
       },
     )
   }
 
-  async function addMessage(threadId: string, content: string) {
+  async function addMessage(threadId: string, content: string, options?: MessageOptions) {
     const now = Date.now()
     const optimisticMsg: Message = {
       id: `temp_msg_${now}`,
@@ -86,6 +87,7 @@ export function useThreads(anchorId: string) {
       createdAt: now,
       user: { ...client.user },
       reactions: [],
+      ...(options?.attachments?.length ? { attachments: options.attachments } : {}),
     }
 
     await withOptimistic(
@@ -97,10 +99,18 @@ export function useThreads(anchorId: string) {
         )
       },
       async () => {
-        await client.adapter.addMessage(threadId, content)
+        await client.adapter.addMessage(threadId, content, options)
         await refresh()
       },
     )
+  }
+
+  async function uploadAttachment(file: File): Promise<Attachment | undefined> {
+    if (!client.adapter.uploadAttachment) {
+      error.value = new Error('Adapter does not support file uploads')
+      return undefined
+    }
+    return withErrorHandling(() => client.adapter.uploadAttachment!(file))
   }
 
   async function editMessage(messageId: string, content: string): Promise<Message | undefined> {
@@ -249,6 +259,7 @@ export function useThreads(anchorId: string) {
     deleteThread,
     addReaction,
     removeReaction,
+    uploadAttachment,
     refresh,
   }
 }
