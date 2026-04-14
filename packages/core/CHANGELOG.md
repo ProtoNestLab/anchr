@@ -1,5 +1,26 @@
 # @anchor-sdk/core
 
+## 1.5.0
+
+### Minor Changes
+
+- 79ee2e0: v1.4.0 — rich text, attachments, @mentions, and virtual scrolling
+
+  **core**
+  - New `Attachment` and `MessageOptions` types
+  - Optional `Adapter.uploadAttachment(file)` plus `attachments` support on `createThread` / `addMessage`
+  - Memory, REST, and WebSocket adapters implement the new surface
+
+  **vue**
+  - `useThreads().uploadAttachment(file)` with error-state fallback
+  - New `useMentions(options)` headless `@mention` autocomplete composable
+  - `useAnchor().send(content, options?)` and `useThreads.{createThread,addMessage}` accept `MessageOptions`
+
+  **ui**
+  - New `<MarkdownEditor>` with write/preview tabs and ⌘B / ⌘I / ⌘K shortcuts
+  - New `<VirtualList>` generic virtual-scrolling list with dynamic row heights
+  - `<ThreadPopover>` and `<AnchorDiscussion>` gain `mentionUsers`, `uploadAttachment`, `virtualize`, and `virtualizeThreshold` props; image attachments render inline, other files as download chips
+
 ## 1.4.0
 
 ### Minor Changes
