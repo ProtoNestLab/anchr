@@ -1,10 +1,25 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
+import type { Attachment, User } from '@anchor-sdk/core'
 import { Anchor, useThreads, useClient } from '@anchor-sdk/vue'
 import CommentButton from './CommentButton.vue'
 import ThreadPopover from './ThreadPopover.vue'
 
-const props = defineProps<{ anchorId: string }>()
+const props = withDefaults(
+  defineProps<{
+    anchorId: string
+    /** Users available for @mention autocomplete. */
+    mentionUsers?: User[]
+    /** Enable virtualized rendering. Default: auto-detect by message count. */
+    virtualize?: boolean
+    virtualizeThreshold?: number
+  }>(),
+  {
+    mentionUsers: () => [],
+    virtualize: undefined,
+    virtualizeThreshold: 50,
+  },
+)
 
 const client = useClient()
 const {
@@ -20,6 +35,7 @@ const {
   deleteThread,
   addReaction,
   removeReaction,
+  uploadAttachment,
 } = useThreads(props.anchorId)
 
 const open = ref(false)
@@ -33,6 +49,8 @@ const unreadCount = computed(() => {
   return total > lastSeenCount.value ? total - lastSeenCount.value : 0
 })
 
+const canUpload = computed(() => Boolean(client.adapter.uploadAttachment))
+
 function handleOpen() {
   open.value = !open.value
   if (open.value) {
@@ -45,11 +63,11 @@ function handleClose() {
   lastSeenCount.value = messageCount.value
 }
 
-function handleSend(content: string) {
+function handleSend(content: string, options?: { attachments?: Attachment[] }) {
   if (threads.value.length > 0) {
-    addMessage(threads.value[0].id, content)
+    addMessage(threads.value[0].id, content, options)
   } else {
-    createThread(content)
+    createThread(content, options)
   }
 }
 </script>
@@ -77,6 +95,10 @@ function handleSend(content: string) {
     :current-user-id="client.user.id"
     :loading="loading"
     :error="error?.message"
+    :mention-users="mentionUsers"
+    :virtualize="virtualize"
+    :virtualize-threshold="virtualizeThreshold"
+    :upload-attachment="canUpload ? uploadAttachment : undefined"
     @send="handleSend"
     @close="handleClose"
     @resolve="resolveThread"

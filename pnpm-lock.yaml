@@ -71,6 +71,9 @@ importers:
       '@anchor-sdk/core':
         specifier: workspace:*
         version: link:../../packages/core
+      '@anchor-sdk/ui':
+        specifier: workspace:*
+        version: link:../../packages/ui
       '@anchor-sdk/vue':
         specifier: workspace:*
         version: link:../../packages/vue

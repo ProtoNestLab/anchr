@@ -23,6 +23,28 @@ type Reaction = {
 }
 ```
 
+### `Attachment`
+
+```ts
+type Attachment = {
+  id: string
+  name: string
+  url: string
+  mimeType: string
+  size: number
+  width?: number // images only
+  height?: number // images only
+}
+```
+
+### `MessageOptions`
+
+```ts
+interface MessageOptions {
+  attachments?: Attachment[]
+}
+```
+
 ### `Message`
 
 ```ts
@@ -33,6 +55,7 @@ type Message = {
   updatedAt?: number
   user: User
   reactions: Reaction[]
+  attachments?: Attachment[]
 }
 ```
 
@@ -76,19 +99,22 @@ type ConnectionStatus = 'online' | 'offline'
 interface Adapter {
   // Threads
   getThreads(anchorId: string): Promise<Thread[]>
-  createThread(anchorId: string, content: string): Promise<Thread>
+  createThread(anchorId: string, content: string, options?: MessageOptions): Promise<Thread>
   resolveThread(threadId: string): Promise<Thread>
   reopenThread(threadId: string): Promise<Thread>
   deleteThread(threadId: string): Promise<void>
 
   // Messages
-  addMessage(threadId: string, content: string): Promise<Message>
+  addMessage(threadId: string, content: string, options?: MessageOptions): Promise<Message>
   editMessage(messageId: string, content: string): Promise<Message>
   deleteMessage(threadId: string, messageId: string): Promise<void>
 
   // Reactions
   addReaction(messageId: string, emoji: string): Promise<Message>
   removeReaction(messageId: string, emoji: string): Promise<Message>
+
+  // Attachments (optional)
+  uploadAttachment?(file: File): Promise<Attachment>
 
   // Real-time (optional)
   subscribe?(anchorId: string, callback: (threads: Thread[]) => void): () => void

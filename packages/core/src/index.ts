@@ -5,6 +5,8 @@ export type {
   Message,
   Thread,
   Adapter,
+  Attachment,
+  MessageOptions,
   PresenceStatus,
   PresenceInfo,
 } from './types'

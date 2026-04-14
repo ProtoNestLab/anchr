@@ -51,8 +51,8 @@ const {
   threads, // Ref<Thread[]>
   loading, // Ref<boolean>
   error, // Ref<Error | null>
-  createThread, // (content: string) => Promise<void>
-  addMessage, // (threadId, content) => Promise<void>
+  createThread, // (content, options?: MessageOptions) => Promise<void>
+  addMessage, // (threadId, content, options?: MessageOptions) => Promise<void>
   editMessage, // (messageId, content) => Promise<Message | undefined>
   deleteMessage, // (threadId, messageId) => Promise<void>
   resolveThread, // (threadId) => Promise<void>
@@ -60,9 +60,12 @@ const {
   deleteThread, // (threadId) => Promise<void>
   addReaction, // (messageId, emoji) => Promise<void>
   removeReaction, // (messageId, emoji) => Promise<void>
+  uploadAttachment, // (file: File) => Promise<Attachment | undefined>
   refresh, // () => Promise<void>
 } = useThreads('order-123')
 ```
+
+**Attachments:** `uploadAttachment(file)` delegates to `adapter.uploadAttachment`. If the adapter does not implement attachments, the method returns `undefined` and `error.value` is set. Pass the returned `Attachment` via `options.attachments` on `createThread` or `addMessage`.
 
 **Optimistic updates:** When you call a mutation (e.g. `createThread`), the UI updates immediately. If the server request fails, the state is rolled back to the previous value and `error` is set.
 
@@ -128,3 +131,59 @@ Manually provide a client (alternative to `<CollabProvider>`).
 ```ts
 provideClient(client)
 ```
+
+### `useMentions(options)`
+
+Headless `@mention` autocomplete composable. Tracks the current `@query` before the cursor and exposes filtered user suggestions with keyboard navigation.
+
+```ts
+import { useMentions } from '@anchor-sdk/vue'
+
+const text = ref('')
+const mentions = useMentions({
+  text,
+  resolveUsers: () => teamMembers, // or async
+  filter: (u) => u.id !== currentUser.id, // optional
+  maxSuggestions: 8, // optional, default 8
+})
+
+function onInput(e: Event) {
+  const el = e.target as HTMLTextAreaElement
+  mentions.onInput(el.selectionStart ?? el.value.length)
+}
+
+function onKeyDown(e: KeyboardEvent) {
+  if (!mentions.active.value) return
+  if (e.key === 'ArrowUp') {
+    mentions.moveUp()
+    e.preventDefault()
+  }
+  if (e.key === 'ArrowDown') {
+    mentions.moveDown()
+    e.preventDefault()
+  }
+  if (e.key === 'Enter') {
+    const r = mentions.select((e.target as HTMLTextAreaElement).selectionStart ?? 0)
+    if (r) {
+      text.value = r.text
+      e.preventDefault()
+    }
+  }
+  if (e.key === 'Escape') mentions.close()
+}
+```
+
+**Returns:**
+
+| Property          | Type                              | Description                                          |
+| ----------------- | --------------------------------- | ---------------------------------------------------- |
+| `active`          | `Ref<boolean>`                    | `true` when an `@query` is being typed               |
+| `query`           | `Ref<string>`                     | The text after `@` (without the `@`)                 |
+| `loading`         | `Ref<boolean>`                    | `true` while async `resolveUsers` is resolving       |
+| `suggestions`     | `Ref<User[]>`                     | Filtered users (max `maxSuggestions`)                |
+| `selectedIndex`   | `Ref<number>`                     | Index of highlighted suggestion                      |
+| `onInput`         | `(cursor: number) => Promise`     | Call from input/keyup handlers with cursor offset    |
+| `moveUp/moveDown` | `() => void`                      | Wraps selection within suggestions                   |
+| `select`          | `(cursor, user?) => Result\|null` | Replaces `@query` — returns `{ text, cursor, user }` |
+| `close`           | `() => void`                      | Closes the popup and resets state                    |
+| `resetCache`      | `() => void`                      | Force `resolveUsers` to be called again              |

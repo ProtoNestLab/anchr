@@ -3,8 +3,9 @@ import { reactive, ref, watch } from 'vue'
 import { createClient, createMemoryAdapter, createOfflineQueue } from '@anchor-sdk/core'
 import type { User, ConnectionStatus } from '@anchor-sdk/core'
 import { CollabProvider } from '@anchor-sdk/vue'
+import { AnchorDiscussion } from '@anchor-sdk/ui'
 import OrderRow from './components/OrderRow.vue'
-import { DEMO_USERS } from './api/users'
+import { DEMO_USERS, listUsers } from './api/users'
 
 /** Shared identity object: adapter and client both read the same reference so switching user updates “current user” for new messages. */
 const activeUser = reactive<User>({ ...DEMO_USERS[0] })
@@ -48,6 +49,28 @@ const orders = [
   { id: 3, name: 'Order C', status: 'Delivered', amount: '$9.99' },
 ]
 
+/** v1.4 showcase: mention users resolver (async to mimic a real API) */
+const teamMembers = () => listUsers()
+
+/** Three tiles to show the all-in-one `<AnchorDiscussion>` with v1.4 features. */
+const docSections = [
+  {
+    id: 'release-notes',
+    title: 'Release Notes',
+    body: 'v1.4.0 adds markdown editing, file/image attachments, @mention autocomplete, and virtual scrolling for long threads.',
+  },
+  {
+    id: 'roadmap',
+    title: 'Roadmap',
+    body: 'What should we tackle next? Leave a comment with ideas — try @mention, drop an image, or paste a long thread.',
+  },
+  {
+    id: 'incidents',
+    title: 'Incident Log',
+    body: 'Post-mortems live here. Attach screenshots, reference teammates, and resolve threads once action items are captured.',
+  },
+]
+
 function statusTagType(status: string) {
   if (status === 'Pending') return 'warning'
   if (status === 'Shipped') return 'primary'
@@ -64,9 +87,9 @@ function statusTagType(status: string) {
           <div class="demo-header-intro">
             <h1 class="demo-title">Orders</h1>
             <p class="demo-sub">
-              Headless <code>useAnchor()</code> + <code>usePresence()</code> with optimistic
-              updates, presence indicators, typing indicators, and offline queue. Pick a user
-              top-right to post as different people. Toggle offline mode to test queuing.
+              Anchor SDK v1.4 — markdown editing, attachments, @mentions, virtual scrolling,
+              presence, typing, and an offline queue. Pick a user top-right to post as different
+              people; toggle offline mode to test queuing.
             </p>
           </div>
           <div class="demo-controls">
@@ -101,20 +124,57 @@ function statusTagType(status: string) {
         </div>
       </el-header>
       <el-main>
-        <el-table :data="orders" stripe border style="width: 100%" table-layout="auto">
-          <el-table-column prop="name" label="Order" min-width="140" />
-          <el-table-column prop="amount" label="Amount" width="120" />
-          <el-table-column label="Status" width="130">
-            <template #default="{ row }">
-              <el-tag :type="statusTagType(row.status)" size="small">{{ row.status }}</el-tag>
-            </template>
-          </el-table-column>
-          <el-table-column label="Discussion" width="140" align="center">
-            <template #default="{ row }">
-              <OrderRow :anchor-id="`order-${row.id}`" />
-            </template>
-          </el-table-column>
-        </el-table>
+        <section class="demo-section">
+          <header class="demo-section-head">
+            <h2 class="demo-section-title">Headless composables</h2>
+            <p class="demo-section-sub">
+              <code>useAnchor()</code> + <code>usePresence()</code> driving a custom popover with
+              Element Plus. Optimistic updates, presence dots, typing indicators, and the offline
+              queue.
+            </p>
+          </header>
+          <el-table :data="orders" stripe border style="width: 100%" table-layout="auto">
+            <el-table-column prop="name" label="Order" min-width="140" />
+            <el-table-column prop="amount" label="Amount" width="120" />
+            <el-table-column label="Status" width="130">
+              <template #default="{ row }">
+                <el-tag :type="statusTagType(row.status)" size="small">{{ row.status }}</el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column label="Discussion" width="140" align="center">
+              <template #default="{ row }">
+                <OrderRow :anchor-id="`order-${row.id}`" />
+              </template>
+            </el-table-column>
+          </el-table>
+        </section>
+
+        <section class="demo-section">
+          <header class="demo-section-head">
+            <h2 class="demo-section-title">All-in-one &lt;AnchorDiscussion&gt;</h2>
+            <p class="demo-section-sub">
+              v1.4 features: markdown editor with preview and keyboard shortcuts, file/image
+              attachments (via the memory adapter's <code>uploadAttachment</code>), @mention
+              autocomplete driven by <code>useMentions</code>, and virtual scrolling for long
+              threads. Hover a card and click the speech-bubble button.
+            </p>
+          </header>
+          <div class="demo-cards">
+            <AnchorDiscussion
+              v-for="s in docSections"
+              :key="s.id"
+              :anchor-id="`doc-${s.id}`"
+              :mention-users="teamMembers"
+              :virtualize="true"
+              :virtualize-threshold="30"
+            >
+              <article class="demo-card">
+                <h3 class="demo-card-title">{{ s.title }}</h3>
+                <p class="demo-card-body">{{ s.body }}</p>
+              </article>
+            </AnchorDiscussion>
+          </div>
+        </section>
       </el-main>
     </el-container>
   </CollabProvider>
@@ -199,5 +259,56 @@ body {
 }
 .demo-status-tag {
   font-size: 11px;
+}
+.demo-section {
+  margin-bottom: 24px;
+}
+.demo-section + .demo-section {
+  margin-top: 32px;
+}
+.demo-section-head {
+  margin-bottom: 12px;
+}
+.demo-section-title {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--el-text-color-primary);
+}
+.demo-section-sub {
+  margin: 6px 0 0;
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
+  line-height: 1.55;
+}
+.demo-section-sub code {
+  font-size: 11px;
+  padding: 0 4px;
+  border-radius: 4px;
+  background: var(--el-fill-color-light);
+}
+.demo-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 16px;
+}
+.demo-card {
+  padding: 16px 18px;
+  background: var(--el-bg-color);
+  border: 1px solid var(--el-border-color);
+  border-radius: 8px;
+  min-height: 110px;
+}
+.demo-card-title {
+  margin: 0 0 6px;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--el-text-color-primary);
+}
+.demo-card-body {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--el-text-color-regular);
 }
 </style>

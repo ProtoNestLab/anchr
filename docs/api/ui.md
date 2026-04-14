@@ -9,14 +9,22 @@ Pre-built UI components with theming support. See [Theming Guide](/guide/theming
 All-in-one discussion component. Integrates Anchor + CommentButton + ThreadPopover with full feature support.
 
 ```vue
-<AnchorDiscussion anchor-id="order-123">
+<AnchorDiscussion
+  anchor-id="order-123"
+  :mention-users="teamMembers"
+  :virtualize="true"
+  :virtualize-threshold="50"
+>
   <div>Order #123</div>
 </AnchorDiscussion>
 ```
 
-| Prop       | Type     | Required | Description              |
-| ---------- | -------- | -------- | ------------------------ |
-| `anchorId` | `string` | Yes      | Unique anchor identifier |
+| Prop                  | Type                                        | Required | Description                                                      |
+| --------------------- | ------------------------------------------- | -------- | ---------------------------------------------------------------- |
+| `anchorId`            | `string`                                    | Yes      | Unique anchor identifier                                         |
+| `mentionUsers`        | `User[] \| () => User[] \| Promise<User[]>` | No       | Users available for `@mention` autocomplete                      |
+| `virtualize`          | `boolean`                                   | No       | Enable virtual scrolling (default: `true`)                       |
+| `virtualizeThreshold` | `number`                                    | No       | Minimum row count before virtualization kicks in (default: `50`) |
 
 **Slot:** Default slot for anchor content.
 
@@ -26,7 +34,10 @@ All-in-one discussion component. Integrates Anchor + CommentButton + ThreadPopov
 - Thread resolve/reopen
 - Message edit/delete (own messages only)
 - Emoji reactions
-- Markdown rendering
+- Markdown editor with write/preview tabs and keyboard shortcuts (⌘B / ⌘I / ⌘K)
+- File & image attachments (when the adapter implements `uploadAttachment`)
+- `@mention` autocomplete with keyboard navigation
+- Virtual scrolling for long threads
 - Keyboard navigation (Esc to close, Enter to send)
 - Real-time updates (when adapter supports it)
 - Loading and error states
@@ -83,17 +94,26 @@ Full-featured discussion popover with error handling and loading states.
 | `loading`       | `boolean`             | No       | Show loading indicator                |
 | `error`         | `string`              | No       | Error message to display              |
 
-| Event            | Payload               | Description     |
-| ---------------- | --------------------- | --------------- |
-| `send`           | `content`             | New message     |
-| `close`          | —                     | Close popover   |
-| `resolve`        | `threadId`            | Resolve thread  |
-| `reopen`         | `threadId`            | Reopen thread   |
-| `deleteThread`   | `threadId`            | Delete thread   |
-| `editMessage`    | `messageId, content`  | Edit message    |
-| `deleteMessage`  | `threadId, messageId` | Delete message  |
-| `addReaction`    | `messageId, emoji`    | Add reaction    |
-| `removeReaction` | `messageId, emoji`    | Remove reaction |
+| Event            | Payload               | Description                                     |
+| ---------------- | --------------------- | ----------------------------------------------- |
+| `send`           | `content, options?`   | New message (options may include `attachments`) |
+| `close`          | —                     | Close popover                                   |
+| `resolve`        | `threadId`            | Resolve thread                                  |
+| `reopen`         | `threadId`            | Reopen thread                                   |
+| `deleteThread`   | `threadId`            | Delete thread                                   |
+| `editMessage`    | `messageId, content`  | Edit message                                    |
+| `deleteMessage`  | `threadId, messageId` | Delete message                                  |
+| `addReaction`    | `messageId, emoji`    | Add reaction                                    |
+| `removeReaction` | `messageId, emoji`    | Remove reaction                                 |
+
+Additional props for the low-level `<ThreadPopover>`:
+
+| Prop                  | Type                                        | Description                                             |
+| --------------------- | ------------------------------------------- | ------------------------------------------------------- |
+| `mentionUsers`        | `User[] \| () => User[] \| Promise<User[]>` | Users available for `@mention` autocomplete             |
+| `uploadAttachment`    | `(file: File) => Promise<Attachment>`       | Pass through from `useThreads` to enable attachments    |
+| `virtualize`          | `boolean`                                   | Enable virtual scrolling (default: `true`)              |
+| `virtualizeThreshold` | `number`                                    | Minimum row count before virtualization (default: `50`) |
 
 **Accessibility:** The popover uses `role="dialog"`, all buttons have `aria-label`, the reaction picker uses `role="listbox"`, and error/loading states use `role="alert"` and `aria-live="polite"`.
 
@@ -122,3 +142,49 @@ renderMarkdown('**hello** *world*')
 | ` ```block``` `     | `<pre><code>block</code></pre>`                               |
 
 Only `http://` and `https://` links are rendered — `javascript:` and other protocols are rejected.
+
+### `<MarkdownEditor>`
+
+Textarea with write/preview tabs, a small formatting toolbar, and keyboard shortcuts. Used internally by `ThreadPopover` and exported for custom compositions.
+
+```vue
+<MarkdownEditor v-model="text" placeholder="Comment..." :disabled="loading" @keydown="handleKey" />
+```
+
+| Prop          | Type      | Required | Description                          |
+| ------------- | --------- | -------- | ------------------------------------ |
+| `modelValue`  | `string`  | Yes      | Current value                        |
+| `placeholder` | `string`  | No       | Textarea placeholder                 |
+| `disabled`    | `boolean` | No       | Disable all input                    |
+| `rows`        | `number`  | No       | Initial textarea rows (default: `3`) |
+
+| Event               | Payload         | Description                           |
+| ------------------- | --------------- | ------------------------------------- |
+| `update:modelValue` | `string`        | Two-way binding                       |
+| `input`             | `InputEvent`    | Raw input event (with cursor info)    |
+| `keydown`           | `KeyboardEvent` | Forwarded keydown (e.g. Enter/Escape) |
+
+**Keyboard shortcuts:** `⌘B` / `Ctrl+B` wraps selection in `**bold**`, `⌘I` in `*italic*`, `⌘K` inserts a link.
+
+**Exposes:** `focus()` and a `textarea` getter returning the underlying element for cursor-aware features like mentions.
+
+### `<VirtualList>`
+
+Generic virtual-scrolling list with dynamic row heights (measured via `ResizeObserver`).
+
+```vue
+<VirtualList :items="rows" :estimated-height="60" :overscan="6" :get-key="(row) => row.id">
+  <template #default="{ item, index }">
+    <MessageRow :row="item" :index="index" />
+  </template>
+</VirtualList>
+```
+
+| Prop              | Type                                   | Required | Description                                    |
+| ----------------- | -------------------------------------- | -------- | ---------------------------------------------- |
+| `items`           | `T[]`                                  | Yes      | Items to render                                |
+| `estimatedHeight` | `number`                               | No       | Default row height estimate (default: `80`)    |
+| `overscan`        | `number`                               | No       | Extra rows rendered above/below (default: `4`) |
+| `getKey`          | `(item: T, index) => string \| number` | No       | Stable key per item (defaults to index)        |
+
+**Exposes:** `scrollToBottom()`, `scrollToIndex(index)`.
