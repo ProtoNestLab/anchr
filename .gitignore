@@ -1,6 +1,8 @@
 # Dependencies
 node_modules/
 
+package-lock.json
+
 # Build outputs
 dist/
 *.tsbuildinfo
@@ -46,3 +48,6 @@ Thumbs.db
 
 # Temp files
 temps/
+
+/plan
+
