@@ -11,4 +11,14 @@ export default defineConfig({
       '@anchor-sdk/ui': resolve(__dirname, '../../packages/ui/src'),
     },
   },
+  server: {
+    proxy: {
+      '/api/kimi': {
+        target: 'https://api.moonshot.cn/v1',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api\/kimi/, ''),
+        secure: true,
+      },
+    },
+  },
 })
