@@ -9,6 +9,7 @@ import { AnchorDiscussion } from '@anchor-sdk/ui'
 import OrderRow from './components/OrderRow.vue'
 import AgentDemo from './AgentDemo.vue'
 import { DEMO_USERS, listUsers } from './api/users'
+import { knowledgeBaseContent } from './knowledge-base-content'
 
 /** Shared identity object: adapter and client both read the same reference so switching user updates “current user” for new messages. */
 const activeUser = reactive<User>({ ...DEMO_USERS[0] })
@@ -37,72 +38,48 @@ const offlineQueue = createOfflineQueue({
 /** AI Agent Configuration */
 const knowledgeBaseConfig: KnowledgeBaseConfig = {
   id: 'demo-knowledge-base',
-  name: '产品文档知识库',
+  name: 'Anchor SDK 项目解读知识库',
   documents: [
-    { id: 'doc-1', name: '产品手册.pdf', url: 'https://example.com/manual.pdf', type: 'pdf' },
-    { id: 'doc-2', name: 'API文档.md', url: 'https://example.com/api.md', type: 'md' },
-    { id: 'doc-3', name: 'FAQ文档.txt', url: 'https://example.com/faq.txt', type: 'txt' },
+    {
+      id: 'doc-1',
+      name: 'Anchor SDK 项目解读.md',
+      type: 'md',
+      content: knowledgeBaseContent,
+    },
   ],
   maxResults: 5,
   similarityThreshold: 0.7,
 }
 
-/**
- * 自定义 LLM 调用示例 - 通过代理调用
- */
-const customLLMCall = async (prompt: string) => {
-  try {
-    console.log('[Agent] Calling Kimi API with model:', import.meta.env.VITE_KIMI_MODEL)
-
-    const response = await fetch('/api/kimi/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${import.meta.env.VITE_ARK_API_KEY || ''}`,
-      },
-      body: JSON.stringify({
-        model: import.meta.env.VITE_KIMI_MODEL || 'moonshot-v1-8k',
-        messages: [
-          {
-            role: 'user',
-            content: prompt,
-          },
-        ],
-        max_tokens: 1024,
-        temperature: 0.7,
-      }),
-    })
-
-    if (!response.ok) {
-      const errorText = await response.text()
-      console.error('API Error:', response.status, errorText)
-      throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`)
-    }
-
-    const data = await response.json()
-    console.log('[Agent] Kimi API response:', data)
-    return data.choices?.[0]?.message?.content || '抱歉，无法生成回复。'
-  } catch (error) {
-    console.error('Custom LLM call failed:', error)
-    throw error
-  }
-}
-
 const agentPlugin = createAgentPlugin({
   kimiApiKey: import.meta.env.VITE_ARK_API_KEY || '',
   kimiModel: import.meta.env.VITE_KIMI_MODEL || 'moonshot-v1-8k',
-  prompt: `你是一个专业的AI助手，帮助用户分析和解决问题。
-你可以使用以下工具：
-1. 搜索工具：用于获取最新信息
-2. 知识库：包含产品文档和FAQ
-3. 可视化工具：用于生成图表
-4. 数据分析工具：用于统计计算
+  prompt: `你是一个专业的 Anchor SDK 技术助手，精通该项目的架构和使用方法。
 
-请根据用户的问题选择合适的工具来回答。`,
-  tools: ['web_search', 'knowledge_base', 'visualization', 'data_analysis'],
+你的知识库中包含完整的 Anchor SDK 项目解读文档，包括：
+- 项目定位和核心价值
+- 架构设计和模块划分
+- 快速开始指南
+- 开发和启动命令
+- REST API 规范
+- AI Agent 功能介绍
+
+当用户询问关于 Anchor SDK 的问题时，请优先使用知识库工具进行检索，以提供准确的答案。
+
+可用工具：
+- knowledge_base: 检索知识库中的文档内容
+- web_search: 搜索最新的外部信息
+- data_analysis: 数据分析和统计
+
+请根据用户问题选择合适的工具：
+1. 如果问题涉及 Anchor SDK 的使用、架构、API等，使用知识库工具
+2. 如果问题需要最新的外部信息，使用搜索工具
+3. 如果需要数据分析，使用数据分析工具
+
+回答时请直接给出答案，不需要使用工具调用格式。`,
+  tools: ['knowledge_base', 'web_search', 'data_analysis'],
   knowledgeBase: knowledgeBaseConfig,
-  // 如果有 API key，使用自定义 LLM 调用（通过代理），否则使用 mock 模式
-  customLLMCall: import.meta.env.VITE_ARK_API_KEY ? customLLMCall : undefined,
+  // 如果没有 API key，自动使用 mock 模式
   mockMode: !import.meta.env.VITE_ARK_API_KEY,
 })
 

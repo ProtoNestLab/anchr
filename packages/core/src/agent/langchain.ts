@@ -1,7 +1,8 @@
 import { ChatOpenAI } from '@langchain/openai'
 import type { AgentOptions, AgentResult } from './types'
 import { KnowledgeBase } from './knowledgeBase'
-import { searchTool, analysisTool, visualizationTool } from './tools'
+import { searchTool, analysisTool, calculatorTool } from './tools'
+// import { visualizationTool } from './tools'
 
 interface AgentTool {
   description: string
@@ -19,7 +20,7 @@ export class LangChainAgent {
     this.options = options
     this.prompt = options.prompt || this.getDefaultPrompt()
 
-    if (!options.mockMode && !options.customLLMCall) {
+    if (!options.mockMode) {
       this.initializeLLM(options)
     }
 
@@ -37,15 +38,19 @@ export class LangChainAgent {
       return
     }
 
+    if (options.customLLMCall) {
+      console.log('[Agent] 使用自定义 LLM 调用')
+      return
+    }
+
+    const useProxy = options.apiConfig?.useProxy !== false
+    if (useProxy) {
+      console.log('[Agent] 使用代理模式，将使用内置 fetch 调用')
+      return
+    }
+
     try {
-      let baseURL = options.apiConfig?.useProxy
-        ? options.apiConfig.proxyBaseUrl
-        : options.kimiApiBase || 'https://api.moonshot.cn/v1'
-
-      if (!baseURL || !baseURL.startsWith('http')) {
-        baseURL = 'https://api.moonshot.cn/v1'
-      }
-
+      const baseURL = options.kimiApiBase || 'https://api.moonshot.cn/v1'
       console.log('[Agent] Initializing LLM with baseURL:', baseURL, 'model:', options.kimiModel)
 
       this.llm = new ChatOpenAI({
@@ -59,9 +64,58 @@ export class LangChainAgent {
         maxTokens: options.maxTokens || 1024,
       })
     } catch (error) {
-      console.error('初始化 LLM 失败，将使用 mock 模式:', error)
+      console.error('初始化 LLM 失败，将使用内置 fetch 方式:', error)
       this.llm = null
     }
+  }
+
+  private async callKimiAPI(systemPrompt: string, userMessage: string): Promise<string> {
+    const apiKey = this.options.kimiApiKey
+    const model = this.options.kimiModel || 'moonshot-v1-8k'
+
+    const useProxy = this.options.apiConfig?.useProxy !== false
+    const baseURL = useProxy
+      ? '/api/kimi'
+      : this.options.kimiApiBase || 'https://api.moonshot.cn/v1'
+
+    const response = await fetch(`${baseURL}/chat/completions`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model,
+        messages: [
+          {
+            role: 'system',
+            content: [{ type: 'text', text: systemPrompt }],
+          },
+          {
+            role: 'user',
+            content: [{ type: 'text', text: userMessage }],
+          },
+        ],
+        temperature: this.options.temperature || 0.7,
+        max_tokens: this.options.maxTokens || 1024,
+      }),
+    })
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => null)
+      throw new Error(errorData?.error?.message || `API 请求失败: ${response.status}`)
+    }
+
+    const data = await response.json()
+    const content = data.choices?.[0]?.message?.content
+
+    if (typeof content === 'string') {
+      return content
+    } else if (Array.isArray(content) && content.length > 0) {
+      return content.map((item: { text?: string }) => item.text).join('') || JSON.stringify(content)
+    }
+
+    return JSON.stringify(data)
   }
 
   private getDefaultPrompt(): string {
@@ -69,8 +123,9 @@ export class LangChainAgent {
 你可以使用以下工具：
 1. web_search：网络搜索，获取最新信息
 2. knowledge_base：查询知识库，获取产品文档和FAQ
-3. data_analysis：数据分析，进行统计计算
-4. visualization：数据可视化，生成图表
+3. calculator：数学计算，处理算术运算和表达式解析
+4. data_analysis：数据分析，进行统计计算、趋势分析、异常值检测等
+// 5. visualization：数据可视化，生成多种类型的图表
 
 请根据用户的问题选择合适的工具来回答。`
   }
@@ -88,11 +143,11 @@ export class LangChainAgent {
         description: '查询知识库，获取产品文档、FAQ等信息',
         func: async (args: unknown) => {
           const query = typeof args === 'string' ? args : String(args ?? '')
-          const results = await this.knowledgeBase!.search(query)
-          if (results.length === 0) {
+          const paragraphs = this.knowledgeBase!.searchRelevantParagraphs(query, 3)
+          if (paragraphs.length === 0) {
             return '知识库中未找到相关信息。'
           }
-          return results.map((r) => `${r.title}: ${r.snippet}`).join('\n')
+          return paragraphs.join('\n\n---\n\n')
         },
       }
     }
@@ -104,25 +159,17 @@ export class LangChainAgent {
       }
     }
 
-    if (options.tools?.includes('visualization')) {
-      this.tools['visualization'] = {
-        description: visualizationTool.description,
-        func: async (args: unknown) => visualizationTool.func(args),
-      }
-    }
+    // if (options.tools?.includes('visualization')) {
+    //   this.tools['visualization'] = {
+    //     description: visualizationTool.description,
+    //     func: async (args: unknown) => visualizationTool.func(args),
+    //   }
+    // }
 
     if (options.tools?.includes('calculator')) {
       this.tools['calculator'] = {
-        description: '用于数学计算',
-        func: async (args: unknown) => {
-          const expression = typeof args === 'string' ? args : String(args ?? '')
-          try {
-            const result = new Function(`return ${expression}`)()
-            return `${expression} = ${result}`
-          } catch {
-            return `无法计算表达式: ${expression}`
-          }
-        },
+        description: calculatorTool.description,
+        func: async (args: unknown) => calculatorTool.func(args),
       }
     }
   }
@@ -228,17 +275,18 @@ ${input}
 
         if (this.options.customLLMCall) {
           console.log('[Agent] 使用自定义 LLM 调用')
-          llmResponse = await this.options.customLLMCall(
-            currentPrompt,
-            this.options as Record<string, unknown>,
-          )
+          llmResponse = await this.options.customLLMCall({
+            systemPrompt: this.prompt,
+            userMessage: input,
+            options: this.options as Record<string, unknown>,
+          })
           modelName = 'custom'
-        } else if (this.options.mockMode || !this.llm) {
+        } else if (this.options.mockMode) {
           console.log('[Agent] 使用 mock 模式')
           llmResponse = this.getMockResponse(currentPrompt)
           modelName = 'mock'
-        } else {
-          console.log('[Agent] 使用真实 LLM')
+        } else if (this.llm) {
+          console.log('[Agent] 使用 LangChain LLM')
           const result = await this.llm.invoke(currentPrompt)
 
           if (typeof result === 'string') {
@@ -251,6 +299,20 @@ ${input}
             llmResponse = JSON.stringify(result)
           }
           modelName = this.llm.modelName
+        } else if (this.options.kimiApiKey) {
+          console.log('[Agent] 使用内置 fetch 调用 Kimi API')
+          try {
+            llmResponse = await this.callKimiAPI(this.prompt, currentPrompt)
+            modelName = this.options.kimiModel || 'moonshot-v1-8k'
+          } catch (error) {
+            console.error('[Agent] Kimi API 调用失败:', error)
+            llmResponse = this.getMockResponse(currentPrompt)
+            modelName = 'mock'
+          }
+        } else {
+          console.log('[Agent] 使用 mock 模式（未配置 API Key）')
+          llmResponse = this.getMockResponse(currentPrompt)
+          modelName = 'mock'
         }
 
         console.log('[Agent] LLM 响应:', llmResponse.substring(0, 150))
@@ -285,10 +347,11 @@ ${input}
 
       if (toolCallCount >= maxToolCalls) {
         if (this.options.customLLMCall) {
-          content = await this.options.customLLMCall(
-            `${this.prompt}\n\n基于以上工具调用结果，请总结回答用户问题：${input}`,
-            this.options as Record<string, unknown>,
-          )
+          content = await this.options.customLLMCall({
+            systemPrompt: this.prompt,
+            userMessage: `基于以上工具调用结果，请总结回答用户问题：${input}`,
+            options: this.options as Record<string, unknown>,
+          })
         } else {
           content = `已完成 ${maxToolCalls} 次工具调用，以下是分析结果：\n\n${currentPrompt}`
         }

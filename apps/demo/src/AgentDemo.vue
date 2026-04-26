@@ -7,6 +7,7 @@ import type { KnowledgeBaseConfig } from '@anchor-sdk/core/agent'
 import { CollabProvider } from '@anchor-sdk/vue'
 import { AnchorDiscussion } from '@anchor-sdk/ui'
 import { DEMO_USERS } from './api/users'
+import { knowledgeBaseContent } from './knowledge-base-content'
 
 /** Shared identity object */
 const activeUser = reactive<User>({ ...DEMO_USERS[0] })
@@ -17,98 +18,32 @@ const offlineQueue = createOfflineQueue({ adapter: rawAdapter })
 /** AI Agent Configuration */
 const knowledgeBaseConfig: KnowledgeBaseConfig = {
   id: 'demo-knowledge-base',
-  name: '产品文档知识库',
+  name: 'Anchor SDK 项目解读知识库',
   documents: [
     {
       id: 'doc-1',
-      name: '产品手册.pdf',
-      url: 'https://example.com/manual.pdf',
-      type: 'pdf',
-      content:
-        '产品手册内容：\n1. 产品名称：智能助手\n2. 版本：v2.0\n3. 主要功能：\n   - 自然语言处理\n   - 知识库检索\n   - 数据分析\n   - 可视化生成\n4. 系统要求：\n   - 操作系统：Windows 10+，macOS 10.15+\n   - 内存：8GB以上\n   - 存储空间：500MB以上',
-    },
-    {
-      id: 'doc-2',
-      name: 'API文档.md',
-      url: 'https://example.com/api.md',
+      name: 'Anchor SDK 项目解读.md',
       type: 'md',
-      content:
-        'API文档：\n1. 认证接口：\n   - POST /api/auth/login\n   - GET /api/auth/me\n2. 用户接口：\n   - GET /api/users\n   - POST /api/users\n   - PUT /api/users/:id\n   - DELETE /api/users/:id\n3. 数据分析接口：\n   - POST /api/analysis\n   - GET /api/analysis/:id',
-    },
-    {
-      id: 'doc-3',
-      name: 'FAQ文档.txt',
-      url: 'https://example.com/faq.txt',
-      type: 'txt',
-      content:
-        '常见问题：\nQ: 如何安装产品？\nA: 下载安装包后双击运行，按照提示完成安装。\n\nQ: 如何重置密码？\nA: 在登录页面点击"忘记密码"，按照提示操作。\n\nQ: 如何联系客服？\nA: 拨打400-123-4567或发送邮件至support@example.com。',
+      content: knowledgeBaseContent,
     },
   ],
   maxResults: 5,
   similarityThreshold: 0.7,
-  embeddings: {
-    provider: 'openai',
-    apiKey: import.meta.env.VITE_OPENAI_API_KEY || '',
-    model: 'text-embedding-3-small',
-  },
-}
-
-/**
- * 自定义 LLM 调用示例 - 通过代理调用
- */
-const customLLMCall = async (prompt: string) => {
-  try {
-    console.log('[Agent] Calling Kimi API with model:', import.meta.env.VITE_KIMI_MODEL)
-
-    const response = await fetch('/api/kimi/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${import.meta.env.VITE_ARK_API_KEY || ''}`,
-      },
-      body: JSON.stringify({
-        model: import.meta.env.VITE_KIMI_MODEL || 'moonshot-v1-8k',
-        messages: [
-          {
-            role: 'user',
-            content: prompt,
-          },
-        ],
-        max_tokens: 1024,
-        temperature: 0.7,
-      }),
-    })
-
-    if (!response.ok) {
-      const errorText = await response.text()
-      console.error('API Error:', response.status, errorText)
-      throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`)
-    }
-
-    const data = await response.json()
-    console.log('[Agent] Kimi API response:', data)
-    return data.choices?.[0]?.message?.content || '抱歉，无法生成回复。'
-  } catch (error) {
-    console.error('Custom LLM call failed:', error)
-    throw error
-  }
 }
 
 const agentPlugin = createAgentPlugin({
   kimiApiKey: import.meta.env.VITE_ARK_API_KEY || '',
   kimiModel: import.meta.env.VITE_KIMI_MODEL || 'moonshot-v1-8k',
-  bingApiKey: import.meta.env.VITE_BING_API_KEY,
   prompt: `你是一个专业的AI助手，帮助用户分析和解决问题。
 你可以使用以下工具：
-1. 搜索工具：用于获取最新信息
-2. 知识库：包含产品文档和FAQ
-3. 可视化工具：用于生成图表
-4. 数据分析工具：用于统计计算
+1. web_search：网络搜索，获取最新信息
+2. knowledge_base：查询知识库，获取产品文档和FAQ
+3. calculator：数学计算，处理算术运算
+4. data_analysis：数据分析，进行统计计算、趋势分析等
 
 请根据用户的问题选择合适的工具来回答。`,
-  tools: ['search', 'knowledge_base', 'visualization', 'analysis'],
+  tools: ['web_search', 'knowledge_base', 'calculator', 'data_analysis'],
   knowledgeBase: knowledgeBaseConfig,
-  customLLMCall: import.meta.env.VITE_ARK_API_KEY ? customLLMCall : undefined,
   mockMode: !import.meta.env.VITE_ARK_API_KEY,
 })
 
@@ -122,23 +57,28 @@ const client = createClient({
 const demoSections = [
   {
     id: 'knowledge-base-demo',
-    title: '知识库信息获取分析',
-    body: '测试指令：\n- @agent 从知识库中查找如何安装产品\n- @agent 知识库中关于API认证的信息\n- @agent 产品的系统要求是什么',
-  },
-  {
-    id: 'context-analysis-demo',
-    title: '聊天上下文分析',
-    body: '测试步骤：\n1. 先发送几条消息，例如："我想了解产品的功能"、"产品有哪些API"\n2. 然后发送：@agent 分析对话内容\n3. 再发送：@agent 总结一下我们的对话',
+    title: '知识库查询',
+    body: '测试指令：\n- @agent Anchor SDK 的核心价值是什么？\n- @agent Anchor SDK 的项目架构是什么？\n- @agent 如何安装 Anchor SDK？\n- @agent Anchor SDK 支持哪些工具？\n- @agent Anchor SDK 的环境要求是什么？\n- @agent AI Agent 模块包含哪些组件？\n- @agent REST API 规范有哪些？\n- @agent Anchor SDK 当前版本是多少？\n- @agent 如何启动演示应用？\n- @agent 插件系统的作用是什么？',
   },
   {
     id: 'calculation-demo',
-    title: '计算',
-    body: '测试指令：\n- @agent 计算 123 + 456\n- @agent 计算 987654321 / 12345\n- @agent 计算 2^10',
+    title: '数学计算',
+    body: '测试指令：\n- @agent 计算 123 + 456\n- @agent 计算 987 * 654\n- @agent 计算 sqrt(16)\n- @agent 计算 sin(30)',
   },
   {
     id: 'data-analysis-demo',
-    title: '数据分析与可视化',
-    body: '测试指令：\n- @agent 分析数据 [1, 2, 3, 4, 5, 6, 7, 8, 9, 10] 的平均值\n- @agent 生成一个柱状图，标题为"月度销售数据"，数据为 [{name: "1月", value: 100}, {name: "2月", value: 150}, {name: "3月", value: 200}]',
+    title: '数据分析',
+    body: '测试指令：\n- @agent 分析数据 [10, 20, 30, 40, 50] 的描述性统计\n- @agent 分析数据 [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 100] 的异常值\n- @agent 分析数据 [5, 8, 12, 15, 20, 25] 的趋势',
+  },
+  {
+    id: 'visualization-demo',
+    title: '数据可视化',
+    body: '测试指令：\n- @agent 生成柱状图，标题为"季度收入"，数据为 [{name:"Q1",value:100},{name:"Q2",value:150},{name:"Q3",value:180},{name:"Q4",value:220}]\n- @agent 生成饼图，标题为"市场份额"，数据为 [{name:"A公司",value:40},{name:"B公司",value:30},{name:"C公司",value:30}]',
+  },
+  {
+    id: 'chat-analysis-demo',
+    title: '对话分析',
+    body: '测试步骤：\n1. 先发送几条消息\n2. 然后发送：@agent 分析我们的对话\n3. 再发送：@agent 总结对话内容',
   },
 ]
 </script>

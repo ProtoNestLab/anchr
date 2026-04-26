@@ -107,8 +107,60 @@ const orders = [
 </template>
 ```
 
+## With AI Agent
+
+Anchor SDK v1.5 新增 AI Agent 功能，支持通过 `@agent` 指令调用 AI 能力：
+
+```vue
+<script setup lang="ts">
+import { createClient, createMemoryAdapter, createOfflineQueue } from '@anchor-sdk/core'
+import { createAgentPlugin } from '@anchor-sdk/core/agent'
+import { CollabProvider } from '@anchor-sdk/vue'
+import { AnchorDiscussion } from '@anchor-sdk/ui'
+
+const rawAdapter = createMemoryAdapter({ id: 'u1', name: 'Alice' })
+const offlineQueue = createOfflineQueue({ adapter: rawAdapter })
+
+const agentPlugin = createAgentPlugin({
+  kimiApiKey: import.meta.env.VITE_ARK_API_KEY || '',
+  prompt: '你是一个专业的AI助手',
+  tools: ['knowledge_base'],
+  knowledgeBase: {
+    id: 'demo-knowledge-base',
+    name: '产品知识库',
+    documents: [
+      {
+        id: 'doc-1',
+        name: '产品手册.md',
+        type: 'md',
+        content: '# 产品手册\n\n## 产品功能\n- 功能A\n- 功能B',
+      },
+    ],
+  },
+  mockMode: !import.meta.env.VITE_ARK_API_KEY,
+})
+
+const client = createClient({
+  adapter: offlineQueue.adapter,
+  user: { id: 'u1', name: 'Alice' },
+  plugins: [agentPlugin],
+})
+</script>
+
+<template>
+  <CollabProvider :client="client">
+    <AnchorDiscussion anchor-id="my-discussion">
+      <div>讨论内容</div>
+    </AnchorDiscussion>
+  </CollabProvider>
+</template>
+```
+
+使用方式：在讨论中输入 `@agent 你的问题` 即可触发 AI 助手。
+
 ## Next Steps
 
+- [AI Agent](/guide/agent) — Integrate Kimi LLM, knowledge base, tools
 - [Real-Time Collaboration](/guide/real-time) — WebSocket, presence, typing, offline support
 - [Custom Adapter](/guide/custom-adapter) — Connect to your own backend
 - [Plugins](/guide/plugins) — Hook into message lifecycle

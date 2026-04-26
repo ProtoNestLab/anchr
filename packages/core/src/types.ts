@@ -44,11 +44,13 @@ export type Thread = {
 
 export type MessageOptions = {
   attachments?: Attachment[]
+  user?: User
 }
 
 export interface Adapter {
   // Threads
   getThreads(anchorId: string): Promise<Thread[]>
+  getAllThreads?(): Promise<Thread[]>
   createThread(anchorId: string, content: string, options?: MessageOptions): Promise<Thread>
   resolveThread(threadId: string): Promise<Thread>
   reopenThread(threadId: string): Promise<Thread>

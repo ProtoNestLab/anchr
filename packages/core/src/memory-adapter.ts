@@ -57,6 +57,10 @@ export function createMemoryAdapter(user?: User): Adapter {
       return threadsByAnchor.get(anchorId) ?? []
     },
 
+    async getAllThreads() {
+      return Array.from(threadsByAnchor.values()).flat()
+    },
+
     async createThread(anchorId, content, options?: MessageOptions) {
       const now = Date.now()
       const thread: Thread = {
@@ -121,7 +125,7 @@ export function createMemoryAdapter(user?: User): Adapter {
         id: uid(),
         content,
         createdAt: now,
-        user: snapshotUser(currentUser),
+        user: options?.user ? snapshotUser(options.user) : snapshotUser(currentUser),
         reactions: [],
         ...(options?.attachments?.length ? { attachments: options.attachments } : {}),
       }

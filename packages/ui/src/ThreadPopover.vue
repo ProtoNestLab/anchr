@@ -55,6 +55,19 @@ const reactionPickerFor = ref<string | null>(null)
 const pendingAttachments = ref<Attachment[]>([])
 const uploadingCount = ref(0)
 const fileInputEl = ref<HTMLInputElement | null>(null)
+const composerEditorRef = ref<HTMLDivElement | null>(null)
+
+const threadMentionStyle = computed(() => {
+  if (!composerEditorRef.value) return {}
+  const rect = composerEditorRef.value.getBoundingClientRect()
+  return {
+    position: 'fixed' as const,
+    left: `${rect.left}px`,
+    bottom: `${window.innerHeight - rect.top + 4}px`,
+    width: `${rect.width}px`,
+    zIndex: '100000',
+  }
+})
 
 const reference = toRef(props, 'referenceEl')
 
@@ -640,7 +653,7 @@ function onBackdropKey(e: KeyboardEvent) {
         </div>
 
         <form aria-label="New comment" class="anchor-composer" @submit.prevent="send">
-          <div class="anchor-composer-editor">
+          <div ref="composerEditorRef" class="anchor-composer-editor">
             <MarkdownEditor
               ref="editorRef"
               v-model="input"
@@ -649,27 +662,32 @@ function onBackdropKey(e: KeyboardEvent) {
               @input="onEditorInput"
               @keydown="onEditorKeydown"
             />
-            <div
-              v-if="mentions.active.value && mentions.suggestions.value.length"
-              class="anchor-mention-popover"
-              role="listbox"
-              aria-label="Mention user"
-            >
-              <button
-                v-for="(u, i) in mentions.suggestions.value"
-                :key="u.id"
-                type="button"
-                class="anchor-mention-item"
-                role="option"
-                :aria-selected="i === mentions.selectedIndex.value"
-                :class="{ 'is-active': i === mentions.selectedIndex.value }"
-                @mousedown.prevent="applyMention(u)"
-                @mouseenter="mentions.selectedIndex.value = i"
-              >
-                <span class="anchor-mention-name">{{ u.name }}</span>
-                <span class="anchor-mention-id">{{ u.id }}</span>
-              </button>
-            </div>
+            <Teleport to="body">
+              <Transition name="dropdown">
+                <div
+                  v-if="mentions.active.value && mentions.suggestions.value.length"
+                  class="anchor-mention-popover"
+                  role="listbox"
+                  aria-label="Mention user"
+                  :style="threadMentionStyle"
+                >
+                  <button
+                    v-for="(u, i) in mentions.suggestions.value"
+                    :key="u.id"
+                    type="button"
+                    class="anchor-mention-item"
+                    role="option"
+                    :aria-selected="i === mentions.selectedIndex.value"
+                    :class="{ 'is-active': i === mentions.selectedIndex.value }"
+                    @mousedown.prevent="applyMention(u)"
+                    @mouseenter="mentions.selectedIndex.value = i"
+                  >
+                    <span class="anchor-mention-name">{{ u.name }}</span>
+                    <span class="anchor-mention-id">{{ u.id }}</span>
+                  </button>
+                </div>
+              </Transition>
+            </Teleport>
           </div>
 
           <div
@@ -947,6 +965,7 @@ function onBackdropKey(e: KeyboardEvent) {
   border-radius: 6px;
   background: var(--anchor-bg, #fff);
   box-shadow: 0 2px 8px var(--anchor-shadow, rgba(0, 0, 0, 0.08));
+  z-index: 1000;
 }
 .anchor-emoji-btn {
   background: none;
@@ -1037,11 +1056,6 @@ function onBackdropKey(e: KeyboardEvent) {
   position: relative;
 }
 .anchor-mention-popover {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 100%;
-  margin-bottom: 4px;
   max-height: 200px;
   overflow-y: auto;
   padding: 4px;
@@ -1049,7 +1063,6 @@ function onBackdropKey(e: KeyboardEvent) {
   border: 1px solid var(--anchor-border, #ddd);
   border-radius: 6px;
   box-shadow: 0 4px 12px var(--anchor-shadow, rgba(0, 0, 0, 0.08));
-  z-index: 5;
 }
 .anchor-mention-item {
   display: flex;

@@ -12,4 +12,5 @@ export { KnowledgeBase } from './knowledgeBase'
 export { createAgentPlugin } from './plugin'
 export { LangChainAgent, createLangChainAgent } from './langchain'
 
-export { searchTool, analysisTool, visualizationTool } from './tools'
+export { searchTool, analysisTool } from './tools'
+// export { visualizationTool } from './tools'

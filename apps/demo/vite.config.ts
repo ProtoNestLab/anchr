@@ -19,6 +19,12 @@ export default defineConfig({
         rewrite: (path) => path.replace(/^\/api\/kimi/, ''),
         secure: true,
       },
+      '/api/baidu': {
+        target: 'https://www.baidu.com',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api\/baidu/, ''),
+        secure: true,
+      },
     },
   },
 })

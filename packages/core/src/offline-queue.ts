@@ -84,6 +84,7 @@ export function createOfflineQueue(options: OfflineQueueOptions) {
   const wrappedAdapter: Adapter = {
     // Reads always go through directly (may fail if truly offline)
     getThreads: (anchorId) => adapter.getThreads(anchorId),
+    getAllThreads: adapter.getAllThreads ? () => adapter.getAllThreads!() : undefined,
 
     // Mutations are queued when offline
     createThread: (anchorId, content) =>
@@ -91,7 +92,8 @@ export function createOfflineQueue(options: OfflineQueueOptions) {
     resolveThread: (threadId) => wrapMutation(() => adapter.resolveThread(threadId)),
     reopenThread: (threadId) => wrapMutation(() => adapter.reopenThread(threadId)),
     deleteThread: (threadId) => wrapMutation(() => adapter.deleteThread(threadId)),
-    addMessage: (threadId, content) => wrapMutation(() => adapter.addMessage(threadId, content)),
+    addMessage: (threadId, content, options) =>
+      wrapMutation(() => adapter.addMessage(threadId, content, options)),
     editMessage: (messageId, content) =>
       wrapMutation(() => adapter.editMessage(messageId, content)),
     deleteMessage: (threadId, messageId) =>

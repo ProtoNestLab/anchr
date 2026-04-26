@@ -34,6 +34,18 @@ const mentionDropdown = ref(false)
 const mentionFilter = ref('')
 const mentionIndex = ref(0)
 const mentionStartPos = ref(0)
+const mentionDropdownRef = ref<HTMLDivElement | null>(null)
+const mentionDropdownStyle = computed(() => {
+  if (!textareaEl.value) return {}
+  const rect = textareaEl.value.getBoundingClientRect()
+  return {
+    position: 'fixed' as const,
+    left: `${rect.left}px`,
+    top: `${rect.bottom + 4}px`,
+    width: `${rect.width}px`,
+    zIndex: '100000',
+  }
+})
 
 const preview = computed(() => renderMarkdown(props.modelValue))
 const isEmpty = computed(() => !props.modelValue.trim())
@@ -289,34 +301,41 @@ defineExpose({
     </div>
 
     <!-- Mention dropdown -->
-    <Transition name="dropdown">
-      <div v-if="mentionDropdown && filteredMentions.length > 0" class="anchor-md-mention-dropdown">
-        <div class="anchor-md-mention-header">
-          <span v-if="mentionFilter">搜索: "{{ mentionFilter }}"</span>
-          <span v-else>选择要提及的对象</span>
-        </div>
-        <ul class="anchor-md-mention-list">
-          <li
-            v-for="(mention, index) in filteredMentions"
-            :key="mention.id"
-            class="anchor-md-mention-item"
-            :class="{ 'is-selected': index === mentionIndex }"
-            @click="selectMention(mention)"
-            @mouseenter="mentionIndex = index"
-          >
-            <span class="anchor-md-mention-avatar">
-              {{ mention.type === 'agent' ? '🤖' : '👤' }}
-            </span>
-            <div class="anchor-md-mention-info">
-              <span class="anchor-md-mention-name">{{ mention.name }}</span>
-              <span class="anchor-md-mention-type">
-                {{ mention.type === 'agent' ? 'AI Agent' : '用户' }}
+    <Teleport to="body">
+      <Transition name="dropdown">
+        <div
+          v-if="mentionDropdown && filteredMentions.length > 0"
+          ref="mentionDropdownRef"
+          class="anchor-md-mention-dropdown"
+          :style="mentionDropdownStyle"
+        >
+          <div class="anchor-md-mention-header">
+            <span v-if="mentionFilter">搜索: "{{ mentionFilter }}"</span>
+            <span v-else>选择要提及的对象</span>
+          </div>
+          <ul class="anchor-md-mention-list">
+            <li
+              v-for="(mention, index) in filteredMentions"
+              :key="mention.id"
+              class="anchor-md-mention-item"
+              :class="{ 'is-selected': index === mentionIndex }"
+              @click="selectMention(mention)"
+              @mouseenter="mentionIndex = index"
+            >
+              <span class="anchor-md-mention-avatar">
+                {{ mention.type === 'agent' ? '🤖' : '👤' }}
               </span>
-            </div>
-          </li>
-        </ul>
-      </div>
-    </Transition>
+              <div class="anchor-md-mention-info">
+                <span class="anchor-md-mention-name">{{ mention.name }}</span>
+                <span class="anchor-md-mention-type">
+                  {{ mention.type === 'agent' ? 'AI Agent' : '用户' }}
+                </span>
+              </div>
+            </li>
+          </ul>
+        </div>
+      </Transition>
+    </Teleport>
 
     <div class="anchor-md-body">
       <textarea
@@ -469,15 +488,10 @@ defineExpose({
 
 /* Mention dropdown styles */
 .anchor-md-mention-dropdown {
-  position: absolute;
-  top: 40px;
-  left: 8px;
-  right: 8px;
   background: var(--anchor-bg, #fff);
   border: 1px solid var(--anchor-border, #d0d0d0);
   border-radius: 8px;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
-  z-index: 100;
   overflow: hidden;
 }
 
