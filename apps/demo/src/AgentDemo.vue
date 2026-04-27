@@ -90,6 +90,7 @@ const {
   threads: headlessThreads,
   loading: headlessLoading,
   error: headlessError,
+  agentIsLoading: headlessAgentIsLoading,
   unreadCount: headlessUnreadCount,
   currentUser: headlessCurrentUser,
   send: headlessSend,
