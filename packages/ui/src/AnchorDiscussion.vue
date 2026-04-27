@@ -26,6 +26,7 @@ const {
   threads,
   loading,
   error,
+  agentIsLoading,
   createThread,
   addMessage,
   editMessage,
@@ -95,6 +96,7 @@ function handleSend(content: string, options?: { attachments?: Attachment[] }) {
     :current-user-id="client.user.id"
     :loading="loading"
     :error="error?.message"
+    :agent-is-loading="agentIsLoading"
     :mention-users="mentionUsers"
     :virtualize="virtualize"
     :virtualize-threshold="virtualizeThreshold"

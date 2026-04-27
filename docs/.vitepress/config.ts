@@ -18,6 +18,7 @@ export default defineConfig({
             { text: 'Real-Time Collaboration', link: '/guide/real-time' },
             { text: 'Custom Adapter', link: '/guide/custom-adapter' },
             { text: 'Plugins', link: '/guide/plugins' },
+            { text: 'AI Agent', link: '/guide/agent' },
             { text: 'Theming', link: '/guide/theming' },
             { text: 'Headless Mode', link: '/guide/headless' },
           ],

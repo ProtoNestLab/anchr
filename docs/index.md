@@ -24,4 +24,6 @@ features:
     details: 离线时自动排队操作，恢复连接后自动同步
   - title: 乐观更新
     details: UI 即时响应，失败时自动回滚
+  - title: AI Agent
+    details: 集成 Kimi 大模型，支持知识库检索、数学计算、数据分析
 ---

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, ref, watch, nextTick, onMounted, onBeforeUnmount } from 'vue'
 import { renderMarkdown } from './markdown'
 
 const props = withDefaults(
@@ -10,6 +10,7 @@ const props = withDefaults(
     maxRows?: number
     disabled?: boolean
     ariaLabel?: string
+    mentions?: { id: string; name: string; type: 'agent' | 'user' }[]
   }>(),
   {
     placeholder: 'Write a message… (markdown supported)',
@@ -17,6 +18,7 @@ const props = withDefaults(
     maxRows: 8,
     disabled: false,
     ariaLabel: 'Message',
+    mentions: () => [{ id: 'agent', name: 'agent', type: 'agent' }],
   },
 )
 
@@ -28,17 +30,145 @@ const emit = defineEmits<{
 
 const mode = ref<'write' | 'preview'>('write')
 const textareaEl = ref<HTMLTextAreaElement | null>(null)
+const mentionDropdown = ref(false)
+const mentionFilter = ref('')
+const mentionIndex = ref(0)
+const mentionStartPos = ref(0)
+const mentionDropdownRef = ref<HTMLDivElement | null>(null)
+const mentionDropdownStyle = computed(() => {
+  if (!textareaEl.value) return {}
+  const rect = textareaEl.value.getBoundingClientRect()
+  return {
+    position: 'fixed' as const,
+    left: `${rect.left}px`,
+    top: `${rect.bottom + 4}px`,
+    width: `${rect.width}px`,
+    zIndex: '100000',
+  }
+})
 
 const preview = computed(() => renderMarkdown(props.modelValue))
 const isEmpty = computed(() => !props.modelValue.trim())
 
+const filteredMentions = computed(() => {
+  if (!mentionFilter.value) return props.mentions
+  const filter = mentionFilter.value.toLowerCase()
+  return props.mentions.filter((m) => m.name.toLowerCase().includes(filter))
+})
+
 function onInput(e: Event) {
   const target = e.target as HTMLTextAreaElement
-  emit('update:modelValue', target.value)
+  const value = target.value
+  emit('update:modelValue', value)
   emit('input', e)
+
+  // 检测 @ 符号
+  checkMention(value, target.selectionStart ?? 0)
 }
 
+function checkMention(value: string, cursorPos: number) {
+  // 找到光标前最近的 @ 符号
+  const lastAtIndex = value.lastIndexOf('@', cursorPos - 1)
+
+  if (lastAtIndex !== -1) {
+    // 检查 @ 后面是否是空格或行首
+    const charAfterAtIndex = value[lastAtIndex + 1]
+    if (!charAfterAtIndex || charAfterAtIndex === ' ' || charAfterAtIndex === '\n') {
+      // 新的 @，显示下拉列表
+      mentionStartPos.value = lastAtIndex
+      mentionFilter.value = ''
+      mentionIndex.value = 0
+      mentionDropdown.value = true
+      return
+    }
+
+    // 检查 @ 和光标之间是否只有字母数字
+    const textAfterAt = value.substring(lastAtIndex + 1, cursorPos)
+    if (/^[a-zA-Z0-9\u4e00-\u9fa5]*$/.test(textAfterAt)) {
+      // 更新过滤词
+      mentionFilter.value = textAfterAt
+      mentionIndex.value = 0
+      mentionDropdown.value = true
+      return
+    }
+  }
+
+  // 没有有效的 @，隐藏下拉列表
+  mentionDropdown.value = false
+}
+
+function selectMention(mention: { id: string; name: string }) {
+  const ta = textareaEl.value
+  if (!ta) return
+
+  const start = mentionStartPos.value
+  const end = start + 1 + mentionFilter.value.length
+  const newValue =
+    props.modelValue.slice(0, start) + `@${mention.name} ` + props.modelValue.slice(end)
+
+  emit('update:modelValue', newValue)
+  mentionDropdown.value = false
+  mentionFilter.value = ''
+
+  // 将光标移动到插入位置之后
+  nextTick(() => {
+    ta.focus()
+    ta.setSelectionRange(start + mention.name.length + 2, start + mention.name.length + 2)
+  })
+}
+
+function closeMentionDropdown() {
+  mentionDropdown.value = false
+  mentionFilter.value = ''
+}
+
+function handleClickOutside(e: MouseEvent) {
+  const dropdown = document.querySelector('.anchor-md-mention-dropdown')
+  const editor = document.querySelector('.anchor-md-editor')
+  if (
+    dropdown &&
+    editor &&
+    !dropdown.contains(e.target as Node) &&
+    !editor.contains(e.target as Node)
+  ) {
+    closeMentionDropdown()
+  }
+}
+
+onMounted(() => {
+  document.addEventListener('click', handleClickOutside, true)
+})
+
+onBeforeUnmount(() => {
+  document.removeEventListener('click', handleClickOutside, true)
+})
+
 function onKeydown(e: KeyboardEvent) {
+  // Mention dropdown navigation
+  if (mentionDropdown.value && filteredMentions.value.length > 0) {
+    if (e.key === 'ArrowDown') {
+      e.preventDefault()
+      mentionIndex.value = (mentionIndex.value + 1) % filteredMentions.value.length
+      return
+    }
+    if (e.key === 'ArrowUp') {
+      e.preventDefault()
+      mentionIndex.value =
+        mentionIndex.value === 0 ? filteredMentions.value.length - 1 : mentionIndex.value - 1
+      return
+    }
+    if (e.key === 'Enter') {
+      e.preventDefault()
+      selectMention(filteredMentions.value[mentionIndex.value])
+      return
+    }
+    if (e.key === 'Escape') {
+      e.preventDefault()
+      closeMentionDropdown()
+      return
+    }
+  }
+
   // Common markdown shortcuts
   if ((e.metaKey || e.ctrlKey) && !e.shiftKey) {
     if (e.key === 'b') {
@@ -170,6 +300,91 @@ defineExpose({
       </div>
     </div>
 
+    <!-- Mention dropdown -->
+    <Teleport to="body">
+      <Transition name="dropdown">
+        <div
+          v-if="mentionDropdown && filteredMentions.length > 0"
+          ref="mentionDropdownRef"
+          class="anchor-md-mention-dropdown"
+          :style="mentionDropdownStyle"
+        >
+          <div class="anchor-md-mention-header">
+            <span v-if="mentionFilter">搜索: "{{ mentionFilter }}"</span>
+            <span v-else>选择要提及的对象</span>
+          </div>
+          <ul class="anchor-md-mention-list">
+            <li
+              v-for="(mention, index) in filteredMentions"
+              :key="mention.id"
+              class="anchor-md-mention-item"
+              :class="{ 'is-selected': index === mentionIndex }"
+              @click="selectMention(mention)"
+              @mouseenter="mentionIndex = index"
+            >
+              <span class="anchor-md-mention-avatar">
+                <svg
+                  v-if="mention.type === 'agent'"
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="20"
+                  height="20"
+                  viewBox="0 0 200 200"
+                  fill="currentColor"
+                >
+                  <circle cx="100" cy="100" r="40" fill="#2563eb" />
+                  <circle cx="100" cy="100" r="30" fill="#3b82f6" />
+                  <circle cx="100" cy="100" r="20" fill="#60a5fa" />
+                  <line
+                    x1="100"
+                    y1="60"
+                    x2="100"
+                    y2="40"
+                    stroke="#2563eb"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                  />
+                  <line
+                    x1="100"
+                    y1="160"
+                    x2="100"
+                    y2="140"
+                    stroke="#2563eb"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                  />
+                  <line
+                    x1="60"
+                    y1="100"
+                    x2="40"
+                    y2="100"
+                    stroke="#2563eb"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                  />
+                  <line
+                    x1="160"
+                    y1="100"
+                    x2="140"
+                    y2="100"
+                    stroke="#2563eb"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                  />
+                </svg>
+                <span v-else>👤</span>
+              </span>
+              <div class="anchor-md-mention-info">
+                <span class="anchor-md-mention-name">{{ mention.name }}</span>
+                <span class="anchor-md-mention-type">
+                  {{ mention.type === 'agent' ? 'AI Agent' : '用户' }}
+                </span>
+              </div>
+            </li>
+          </ul>
+        </div>
+      </Transition>
+    </Teleport>
+
     <div class="anchor-md-body">
       <textarea
         v-if="mode === 'write'"
@@ -182,6 +397,11 @@ defineExpose({
         :style="{ minHeight: minRows * 1.5 + 'em', maxHeight: maxRows * 1.5 + 'em' }"
         @input="onInput"
         @keydown="onKeydown"
+        @click="
+          (e) => {
+            checkMention(modelValue, (e.target as HTMLTextAreaElement).selectionStart ?? 0)
+          }
+        "
       />
       <div
         v-else
@@ -202,6 +422,7 @@ defineExpose({
   border-radius: 8px;
   background: var(--anchor-bg, #fff);
   overflow: hidden;
+  position: relative;
 }
 .anchor-md-editor.is-disabled {
   opacity: 0.65;
@@ -311,5 +532,78 @@ defineExpose({
   background: var(--anchor-code-bg, #f6f8fa);
   border-radius: 3px;
   font-size: 12.5px;
+}
+
+/* Mention dropdown styles */
+.anchor-md-mention-dropdown {
+  background: var(--anchor-bg, #fff);
+  border: 1px solid var(--anchor-border, #d0d0d0);
+  border-radius: 8px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  overflow: hidden;
+}
+
+.anchor-md-mention-header {
+  padding: 8px 12px;
+  font-size: 12px;
+  color: var(--anchor-text-muted, #777);
+  border-bottom: 1px solid var(--anchor-border-light, #ebebeb);
+  background: var(--anchor-toolbar-bg, #fafafa);
+}
+
+.anchor-md-mention-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.anchor-md-mention-item {
+  display: flex;
+  align-items: center;
+  padding: 8px 12px;
+  cursor: pointer;
+  transition: background-color 0.15s;
+}
+
+.anchor-md-mention-item:hover,
+.anchor-md-mention-item.is-selected {
+  background: var(--anchor-hover, #ececec);
+}
+
+.anchor-md-mention-avatar {
+  font-size: 20px;
+  margin-right: 10px;
+}
+
+.anchor-md-mention-info {
+  display: flex;
+  flex-direction: column;
+}
+
+.anchor-md-mention-name {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--anchor-text, #333);
+}
+
+.anchor-md-mention-type {
+  font-size: 12px;
+  color: var(--anchor-text-muted, #777);
+}
+
+/* Dropdown transition */
+.dropdown-enter-active,
+.dropdown-leave-active {
+  transition:
+    opacity 0.15s ease,
+    transform 0.15s ease;
+}
+
+.dropdown-enter-from,
+.dropdown-leave-to {
+  opacity: 0;
+  transform: translateY(-8px);
 }
 </style>

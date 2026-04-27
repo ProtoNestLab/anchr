@@ -19,7 +19,7 @@ export interface Plugin {
   afterAddMessage?(message: Message): void
 }
 
-export function applyPlugins(client: Client, plugins: Plugin[]): Client {
+export function applyPlugins(client: Client, plugins: Plugin[]): Client & { plugins: Plugin[] } {
   const originalAdapter = client.adapter
 
   for (const plugin of plugins) {
@@ -28,6 +28,7 @@ export function applyPlugins(client: Client, plugins: Plugin[]): Client {
 
   return {
     ...client,
+    plugins,
     adapter: {
       ...originalAdapter,
 

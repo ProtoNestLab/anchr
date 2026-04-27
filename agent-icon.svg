@@ -1,0 +1,35 @@
+<svg width="200" height="200" viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- 背景圆形 -->
+  <circle cx="100" cy="100" r="95" fill="#f0f4f8"/>
+  
+  <!-- 核心几何形状 -->
+  <rect x="40" y="40" width="120" height="120" rx="15" fill="#e6f0fa" stroke="#2563eb" stroke-width="2"/>
+  
+  <!-- 智能节点 -->
+  <circle cx="100" cy="100" r="40" fill="#2563eb"/>
+  <circle cx="100" cy="100" r="30" fill="#3b82f6"/>
+  <circle cx="100" cy="100" r="20" fill="#60a5fa"/>
+  
+  <!-- 连接线条 -->
+  <line x1="100" y1="60" x2="100" y2="40" stroke="#2563eb" stroke-width="2" stroke-linecap="round"/>
+  <line x1="100" y1="160" x2="100" y2="140" stroke="#2563eb" stroke-width="2" stroke-linecap="round"/>
+  <line x1="60" y1="100" x2="40" y2="100" stroke="#2563eb" stroke-width="2" stroke-linecap="round"/>
+  <line x1="160" y1="100" x2="140" y2="100" stroke="#2563eb" stroke-width="2" stroke-linecap="round"/>
+  
+  <!-- 对角线连接 -->
+  <line x1="70" y1="70" x2="55" y2="55" stroke="#2563eb" stroke-width="2" stroke-linecap="round"/>
+  <line x1="130" y1="70" x2="145" y2="55" stroke="#2563eb" stroke-width="2" stroke-linecap="round"/>
+  <line x1="70" y1="130" x2="55" y2="145" stroke="#2563eb" stroke-width="2" stroke-linecap="round"/>
+  <line x1="130" y1="130" x2="145" y2="145" stroke="#2563eb" stroke-width="2" stroke-linecap="round"/>
+  
+  <!-- 外部节点 -->
+  <circle cx="100" cy="40" r="8" fill="#60a5fa" stroke="#2563eb" stroke-width="1.5"/>
+  <circle cx="100" cy="160" r="8" fill="#60a5fa" stroke="#2563eb" stroke-width="1.5"/>
+  <circle cx="40" cy="100" r="8" fill="#60a5fa" stroke="#2563eb" stroke-width="1.5"/>
+  <circle cx="160" cy="100" r="8" fill="#60a5fa" stroke="#2563eb" stroke-width="1.5"/>
+  
+  <circle cx="55" cy="55" r="6" fill="#93c5fd" stroke="#2563eb" stroke-width="1.5"/>
+  <circle cx="145" cy="55" r="6" fill="#93c5fd" stroke="#2563eb" stroke-width="1.5"/>
+  <circle cx="55" cy="145" r="6" fill="#93c5fd" stroke="#2563eb" stroke-width="1.5"/>
+  <circle cx="145" cy="145" r="6" fill="#93c5fd" stroke="#2563eb" stroke-width="1.5"/>
+</svg>

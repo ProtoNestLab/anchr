@@ -1,6 +1,12 @@
 # Dependencies
 node_modules/
 
+package-lock.json
+
+plan/
+
+docs/.vitepress/
+
 # Build outputs
 dist/
 *.tsbuildinfo
@@ -46,3 +52,6 @@ Thumbs.db
 
 # Temp files
 temps/
+
+/plan
+

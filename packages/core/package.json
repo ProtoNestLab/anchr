@@ -8,6 +8,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./agent": {
+      "types": "./dist/agent/index.d.ts",
+      "import": "./dist/agent/index.js"
     }
   },
   "files": [
@@ -16,6 +20,14 @@
   "scripts": {
     "build": "tsc",
     "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@langchain/community": "^0.0.20",
+    "@langchain/core": "0.1.63",
+    "@langchain/openai": "^0.0.20",
+    "axios": "^1.15.2",
+    "langchain": "^0.1.0",
+    "zod": "^3.25.28"
   },
   "devDependencies": {
     "typescript": "^5.4.0"
