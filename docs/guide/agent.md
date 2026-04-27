@@ -224,61 +224,117 @@ const agentPlugin = createAgentPlugin({
 
 ### API 代理配置
 
-开发环境下使用 Vite 代理避免 CORS 问题：
+由于浏览器的 CORS 限制，直接从前端调用 AI API 可能会遇到跨域问题。现在代理配置已简化，Agent 插件会默认请求本地接口，你只需要在本地服务器中配置代理即可。
+
+#### 1. 开发环境配置 (Vite)
+
+在 `vite.config.ts` 文件中添加代理配置：
 
 ```ts
 // vite.config.ts
 export default defineConfig({
   server: {
     proxy: {
+      // Kimi API 代理
       '/api/kimi': {
         target: 'https://api.moonshot.cn/v1',
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api\/kimi/, ''),
+      },
+      // 百度 API 代理
+      '/api/baidu': {
+        target: 'https://aip.baidubce.com',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api\/baidu/, ''),
       },
     },
   },
 })
 ```
 
-然后在 Agent 配置中启用代理：
+#### 2. 生产环境配置
 
-```ts
-const agentPlugin = createAgentPlugin({
-  kimiApiKey: import.meta.env.VITE_ARK_API_KEY || '',
-  apiConfig: {
-    useProxy: true, // 启用代理
-    proxyBaseUrl: '/api/kimi', // 代理路径
-  },
+在生产环境中，你需要在后端服务器上配置代理。以下是常见服务器的配置示例：
+
+**Nginx 配置**
+
+```nginx
+server {
+  listen 80;
+  server_name your-domain.com;
+
+  location /api/kimi/ {
+    proxy_pass https://api.moonshot.cn/v1/;
+    proxy_set_header Host api.moonshot.cn;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+  }
+
+  location /api/baidu/ {
+    proxy_pass https://aip.baidubce.com/;
+    proxy_set_header Host aip.baidubce.com;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+  }
+
+  # 其他配置...
+}
+```
+
+**Express.js 配置**
+
+```javascript
+const express = require('express')
+const { createProxyMiddleware } = require('http-proxy-middleware')
+
+const app = express()
+
+// Kimi API 代理
+app.use(
+  '/api/kimi',
+  createProxyMiddleware({
+    target: 'https://api.moonshot.cn/v1',
+    changeOrigin: true,
+    pathRewrite: {
+      '^/api/kimi': '',
+    },
+  }),
+)
+
+// 百度 API 代理
+app.use(
+  '/api/baidu',
+  createProxyMiddleware({
+    target: 'https://aip.baidubce.com',
+    changeOrigin: true,
+    pathRewrite: {
+      '^/api/baidu': '',
+    },
+  }),
+)
+
+// 其他路由...
+
+app.listen(3000, () => {
+  console.log('Server running on port 3000')
 })
 ```
 
-## 事件钩子
+#### 3. 环境变量配置
 
-Agent 插件支持以下生命周期钩子：
+在 `.env` 文件中添加 API Key：
 
-```ts
-const agentPlugin = createAgentPlugin({
-  kimiApiKey: 'your-key',
-
-  // Agent 开始执行前
-  beforeExecute: (command, context) => {
-    console.log('Agent 即将执行:', command)
-    return { command, context }
-  },
-
-  // Agent 执行完成后
-  afterExecute: (result) => {
-    console.log('Agent 执行结果:', result)
-    return result
-  },
-
-  // Agent 执行失败时
-  onError: (error) => {
-    console.error('Agent 执行错误:', error)
-  },
-})
+```env
+# Kimi API
+VITE_ARK_API_KEY=your-kimi-api-key
 ```
+
+#### 4. 代理配置注意事项
+
+1. **安全问题**：API Key 应该通过环境变量或后端服务管理，不要硬编码在前端代码中
+2. **跨域设置**：确保代理服务器正确设置了 `changeOrigin` 选项
+3. **错误处理**：添加适当的错误处理，以便在 API 调用失败时提供友好的提示
+4. **性能优化**：考虑添加缓存机制，减少重复的 API 调用
 
 ## 使用示例
 
@@ -354,7 +410,7 @@ const agentPlugin = createAgentPlugin({
 
 ### CORS 错误
 
-确保在 `vite.config.ts` 中配置了代理，并且 `apiConfig.useProxy` 为 `true`。
+确保在 `vite.config.ts` 中配置了代理，Agent 插件会默认使用本地代理接口。
 
 ### API Key 无效
 

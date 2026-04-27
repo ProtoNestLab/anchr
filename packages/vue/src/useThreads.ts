@@ -1,5 +1,6 @@
 import { ref, onMounted, onUnmounted } from 'vue'
 import type { Thread, Message, Attachment, MessageOptions } from '@anchor-sdk/core'
+import type { AgentPlugin } from '@anchor-sdk/core/agent'
 import { useClient } from './provider'
 
 export function useThreads(anchorId: string) {
@@ -7,6 +8,20 @@ export function useThreads(anchorId: string) {
   const threads = ref<Thread[]>([])
   const loading = ref(false)
   const error = ref<Error | null>(null)
+
+  const agentIsLoading = ref(false)
+
+  // 监听agent插件的isLoading状态
+  function checkAgentLoading() {
+    const agentPlugin = client.plugins?.find((p): p is AgentPlugin => p.name === 'agent')
+    agentIsLoading.value = agentPlugin?.isLoading || false
+  }
+
+  // 初始检查
+  checkAgentLoading()
+
+  // 每隔100毫秒检查一次agent的加载状态
+  const intervalId = setInterval(checkAgentLoading, 100)
 
   function snapshot(): Thread[] {
     return JSON.parse(JSON.stringify(threads.value))
@@ -244,12 +259,14 @@ export function useThreads(anchorId: string) {
 
   onUnmounted(() => {
     unsubscribe?.()
+    clearInterval(intervalId)
   })
 
   return {
     threads,
     loading,
     error,
+    agentIsLoading,
     createThread,
     addMessage,
     editMessage,

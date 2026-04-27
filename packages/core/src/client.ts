@@ -13,9 +13,9 @@ export interface ClientOptions {
   plugins?: Plugin[]
 }
 
-export function createClient(options: ClientOptions): Client {
+export function createClient(options: ClientOptions): Client & { plugins?: Plugin[] } {
   const user = options.user ?? { id: 'anonymous', name: 'Anonymous' }
-  let client: Client = { adapter: options.adapter, user }
+  let client: Client & { plugins?: Plugin[] } = { adapter: options.adapter, user }
 
   if (options.plugins?.length) {
     client = applyPlugins(client, options.plugins)

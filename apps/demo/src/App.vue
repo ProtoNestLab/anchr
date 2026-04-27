@@ -286,7 +286,55 @@ function statusTagType(status: string) {
                   :virtualize-threshold="30"
                 >
                   <article class="demo-card agent-card">
-                    <div class="agent-icon">🤖</div>
+                    <div class="agent-icon">
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        width="28"
+                        height="28"
+                        viewBox="0 0 200 200"
+                        fill="currentColor"
+                      >
+                        <circle cx="100" cy="100" r="40" fill="#2563eb" />
+                        <circle cx="100" cy="100" r="30" fill="#3b82f6" />
+                        <circle cx="100" cy="100" r="20" fill="#60a5fa" />
+                        <line
+                          x1="100"
+                          y1="60"
+                          x2="100"
+                          y2="40"
+                          stroke="#2563eb"
+                          stroke-width="2"
+                          stroke-linecap="round"
+                        />
+                        <line
+                          x1="100"
+                          y1="160"
+                          x2="100"
+                          y2="140"
+                          stroke="#2563eb"
+                          stroke-width="2"
+                          stroke-linecap="round"
+                        />
+                        <line
+                          x1="60"
+                          y1="100"
+                          x2="40"
+                          y2="100"
+                          stroke="#2563eb"
+                          stroke-width="2"
+                          stroke-linecap="round"
+                        />
+                        <line
+                          x1="160"
+                          y1="100"
+                          x2="140"
+                          y2="100"
+                          stroke="#2563eb"
+                          stroke-width="2"
+                          stroke-linecap="round"
+                        />
+                      </svg>
+                    </div>
                     <h3 class="demo-card-title">{{ agentDemoSection.title }}</h3>
                     <pre class="demo-card-body agent-body">{{ agentDemoSection.body }}</pre>
                   </article>

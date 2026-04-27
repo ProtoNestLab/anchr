@@ -14,6 +14,8 @@ const props = withDefaults(
     currentUserId?: string
     loading?: boolean
     error?: string
+    /** Agent is currently processing a request. */
+    agentIsLoading?: boolean
     /** Users available for @mention autocomplete. */
     mentionUsers?: User[]
     /** Upload handler. If provided, enables the attachment button. */
@@ -27,6 +29,7 @@ const props = withDefaults(
     currentUserId: undefined,
     loading: false,
     error: undefined,
+    agentIsLoading: false,
     mentionUsers: () => [],
     uploadAttachment: undefined,
     virtualize: undefined,
@@ -302,7 +305,14 @@ function onBackdropKey(e: KeyboardEvent) {
             {{ error }}
           </div>
           <div v-if="loading" class="anchor-loading" aria-live="polite">Loading…</div>
-          <p v-if="!loading && !error && threads.length === 0" class="anchor-empty">
+          <div v-if="agentIsLoading" class="anchor-loading anchor-agent-loading" aria-live="polite">
+            <span class="anchor-loading-spinner"></span>
+            agent 思考中…
+          </div>
+          <p
+            v-if="!loading && !error && !agentIsLoading && threads.length === 0"
+            class="anchor-empty"
+          >
             No comments yet. Start the conversation!
           </p>
 
@@ -358,6 +368,59 @@ function onBackdropKey(e: KeyboardEvent) {
                 >
                   <div class="anchor-message">
                     <div class="anchor-message-header">
+                      <div class="anchor-message-avatar">
+                        <svg
+                          v-if="item.message.user.id === 'agent'"
+                          xmlns="http://www.w3.org/2000/svg"
+                          width="16"
+                          height="16"
+                          viewBox="0 0 200 200"
+                          fill="currentColor"
+                        >
+                          <circle cx="100" cy="100" r="40" fill="#2563eb" />
+                          <circle cx="100" cy="100" r="30" fill="#3b82f6" />
+                          <circle cx="100" cy="100" r="20" fill="#60a5fa" />
+                          <line
+                            x1="100"
+                            y1="60"
+                            x2="100"
+                            y2="40"
+                            stroke="#2563eb"
+                            stroke-width="2"
+                            stroke-linecap="round"
+                          />
+                          <line
+                            x1="100"
+                            y1="160"
+                            x2="100"
+                            y2="140"
+                            stroke="#2563eb"
+                            stroke-width="2"
+                            stroke-linecap="round"
+                          />
+                          <line
+                            x1="60"
+                            y1="100"
+                            x2="40"
+                            y2="100"
+                            stroke="#2563eb"
+                            stroke-width="2"
+                            stroke-linecap="round"
+                          />
+                          <line
+                            x1="160"
+                            y1="100"
+                            x2="140"
+                            y2="100"
+                            stroke="#2563eb"
+                            stroke-width="2"
+                            stroke-linecap="round"
+                          />
+                        </svg>
+                        <span v-else class="anchor-avatar-initial">{{
+                          item.message.user.name.charAt(0).toUpperCase()
+                        }}</span>
+                      </div>
                       <strong>{{ item.message.user.name }}</strong>
                       <span class="anchor-time">{{ formatTime(item.message.createdAt) }}</span>
                       <span v-if="item.message.updatedAt" class="anchor-edited">(edited)</span>
@@ -530,6 +593,59 @@ function onBackdropKey(e: KeyboardEvent) {
 
                 <div v-for="msg in thread.messages" :key="msg.id" class="anchor-message">
                   <div class="anchor-message-header">
+                    <div class="anchor-message-avatar">
+                      <svg
+                        v-if="msg.user.id === 'agent'"
+                        xmlns="http://www.w3.org/2000/svg"
+                        width="16"
+                        height="16"
+                        viewBox="0 0 200 200"
+                        fill="currentColor"
+                      >
+                        <circle cx="100" cy="100" r="40" fill="#2563eb" />
+                        <circle cx="100" cy="100" r="30" fill="#3b82f6" />
+                        <circle cx="100" cy="100" r="20" fill="#60a5fa" />
+                        <line
+                          x1="100"
+                          y1="60"
+                          x2="100"
+                          y2="40"
+                          stroke="#2563eb"
+                          stroke-width="2"
+                          stroke-linecap="round"
+                        />
+                        <line
+                          x1="100"
+                          y1="160"
+                          x2="100"
+                          y2="140"
+                          stroke="#2563eb"
+                          stroke-width="2"
+                          stroke-linecap="round"
+                        />
+                        <line
+                          x1="60"
+                          y1="100"
+                          x2="40"
+                          y2="100"
+                          stroke="#2563eb"
+                          stroke-width="2"
+                          stroke-linecap="round"
+                        />
+                        <line
+                          x1="160"
+                          y1="100"
+                          x2="140"
+                          y2="100"
+                          stroke="#2563eb"
+                          stroke-width="2"
+                          stroke-linecap="round"
+                        />
+                      </svg>
+                      <span v-else class="anchor-avatar-initial">{{
+                        msg.user.name.charAt(0).toUpperCase()
+                      }}</span>
+                    </div>
                     <strong>{{ msg.user.name }}</strong>
                     <span class="anchor-time">{{ formatTime(msg.createdAt) }}</span>
                     <span v-if="msg.updatedAt" class="anchor-edited">(edited)</span>
@@ -814,6 +930,31 @@ function onBackdropKey(e: KeyboardEvent) {
   padding: 16px 0;
   font-size: 13px;
 }
+
+.anchor-agent-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.anchor-loading-spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid var(--anchor-border, #ddd);
+  border-top: 2px solid var(--anchor-primary, #4a90d9);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
 .anchor-empty {
   color: var(--anchor-text-muted, #999);
   text-align: center;
@@ -895,8 +1036,29 @@ function onBackdropKey(e: KeyboardEvent) {
 }
 .anchor-message-header {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   gap: 6px;
+}
+
+.anchor-message-avatar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 4px;
+  background: var(--anchor-bg, #f0f0f0);
+  flex-shrink: 0;
+}
+
+.anchor-avatar-initial {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--anchor-text, #333);
+}
+
+.anchor-message-avatar img {
+  border-radius: 4px;
 }
 .anchor-time {
   font-size: 11px;
